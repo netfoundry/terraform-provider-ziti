@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/openziti/edge-api/rest_model"
 	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
@@ -215,6 +216,7 @@ func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest
 func (r *serviceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
 	var state serviceResourceModel
+	tflog.Debug(ctx, "Reading Service")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -304,6 +306,7 @@ func (r *serviceResource) Read(ctx context.Context, req resource.ReadRequest, re
 func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
 	var eplan serviceResourceModel
+	tflog.Debug(ctx, "Updating Service")
 	diags := req.Plan.Get(ctx, &eplan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -376,6 +379,7 @@ func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest
 func (r *serviceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
 	var state serviceResourceModel
+	tflog.Debug(ctx, "Deleting Service")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

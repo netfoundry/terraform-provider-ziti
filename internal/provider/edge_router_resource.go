@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/openziti/edge-api/rest_model"
 	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
@@ -209,6 +210,7 @@ func (r *edgeRouterResource) Create(ctx context.Context, req resource.CreateRequ
 func (r *edgeRouterResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
 	var state edgeRouterResourceModel
+	tflog.Debug(ctx, "Reading Edge Router")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -300,6 +302,7 @@ func (r *edgeRouterResource) Read(ctx context.Context, req resource.ReadRequest,
 func (r *edgeRouterResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
 	var eplan edgeRouterResourceModel
+	tflog.Debug(ctx, "Updating Edge Router")
 	diags := req.Plan.Get(ctx, &eplan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -366,6 +369,7 @@ func (r *edgeRouterResource) Update(ctx context.Context, req resource.UpdateRequ
 func (r *edgeRouterResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
 	var state edgeRouterResourceModel
+	tflog.Debug(ctx, "Deleting Edge Router")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
