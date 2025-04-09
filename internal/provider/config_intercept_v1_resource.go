@@ -351,6 +351,7 @@ func (r *interceptV1ConfigResource) Create(ctx context.Context, req resource.Cre
 func (r *interceptV1ConfigResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
 	var state interceptV1ConfigResourceModel
+	tflog.Debug(ctx, "Reading Intercept Config")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -418,6 +419,7 @@ func (r *interceptV1ConfigResource) Read(ctx context.Context, req resource.ReadR
 func (r *interceptV1ConfigResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
 	var eplan interceptV1ConfigResourceModel
+	tflog.Debug(ctx, "Updating Intercept Config")
 	diags := req.Plan.Get(ctx, &eplan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -481,6 +483,7 @@ func (r *interceptV1ConfigResource) Update(ctx context.Context, req resource.Upd
 func (r *interceptV1ConfigResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
 	var state interceptV1ConfigResourceModel
+	tflog.Debug(ctx, "Deleting Intercept Config")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

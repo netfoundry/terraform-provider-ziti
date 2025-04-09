@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/openziti/edge-api/rest_model"
 	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
@@ -224,6 +225,7 @@ func (r *servicePolicyResource) Create(ctx context.Context, req resource.CreateR
 func (r *servicePolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
 	var state servicePolicyResourceModel
+	tflog.Debug(ctx, "Reading Service Policy")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -317,6 +319,7 @@ func (r *servicePolicyResource) Read(ctx context.Context, req resource.ReadReque
 func (r *servicePolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
 	var eplan servicePolicyResourceModel
+	tflog.Debug(ctx, "Updating Service Policy")
 	diags := req.Plan.Get(ctx, &eplan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -395,6 +398,7 @@ func (r *servicePolicyResource) Update(ctx context.Context, req resource.UpdateR
 func (r *servicePolicyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
 	var state servicePolicyResourceModel
+	tflog.Debug(ctx, "Deleting Service Policy")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

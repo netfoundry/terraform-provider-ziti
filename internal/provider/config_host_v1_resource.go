@@ -735,6 +735,7 @@ func (r *hostV1ConfigResource) Create(ctx context.Context, req resource.CreateRe
 func (r *hostV1ConfigResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
 	var state hostV1ConfigResourceModel
+	tflog.Debug(ctx, "Reading Host Config")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -803,6 +804,7 @@ func (r *hostV1ConfigResource) Read(ctx context.Context, req resource.ReadReques
 func (r *hostV1ConfigResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
 	var eplan hostV1ConfigResourceModel
+	tflog.Debug(ctx, "Updating Host Config")
 	diags := req.Plan.Get(ctx, &eplan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -866,6 +868,7 @@ func (r *hostV1ConfigResource) Update(ctx context.Context, req resource.UpdateRe
 func (r *hostV1ConfigResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
 	var state hostV1ConfigResourceModel
+	tflog.Debug(ctx, "Deleting Host Config")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

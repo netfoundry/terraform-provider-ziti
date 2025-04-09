@@ -59,6 +59,8 @@ provider "ziti" {
 
 If you wish to work on the provider, you'll first need [Go](http://www.golang.org) installed on your machine (see [Requirements](#requirements)).
 
+For local plugin development see [Local Plugin Development](#local-plugin-development) before building the provider.
+
 To compile the provider, run `go install`. This will build the provider and put the provider binary in the `$GOPATH/bin` directory.
 
 
@@ -89,3 +91,22 @@ To add a new dependency `github.com/author/dependency` to your Terraform provide
 go get github.com/author/dependency
 go mod tidy
 ```
+
+## Local Plugin Development
+Add the below snippet at ~/.terraformrc on your machine.
+
+```
+provider_installation {
+
+  dev_overrides {
+    # point to local go path for compiled binaries
+    "netfoundry/ziti" = "/path/to/go/bin"
+  }
+
+  # For all other providers, install them directly from their origin provider
+  # registries as normal. If you omit this, Terraform will _only_ use
+  # the dev_overrides block, and so no other providers will be available.
+  direct {}
+}
+```
+#### NOTE: Do not run terraform init during local development
