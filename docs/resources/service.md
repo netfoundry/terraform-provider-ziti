@@ -51,3 +51,12 @@ resource "ziti_service" "test_service" {
 
 - `id` (String) Identifier
 - `last_updated` (String) Last Updated Time
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# service can be imported by specifying the identifier.
+terraform import ziti_service.test_service <ID>
+```

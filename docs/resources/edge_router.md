@@ -48,3 +48,12 @@ resource "ziti_edge_router" "test_edge_router" {
 
 - `id` (String) Identifier
 - `last_updated` (String) Last Updated Time
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# edge router can be imported by specifying the identifier.
+terraform import ziti_edge_router.test_edge_router <ID>
+```

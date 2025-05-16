@@ -41,3 +41,12 @@ resource "ziti_service_edge_router_policy" "test_service_er_policy" {
 
 - `id` (String) Identifier
 - `last_updated` (String) Last Updated Time
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# service edge router policy can be imported by specifying the identifier.
+terraform import ziti_service_edge_router_policy.test_service_er_policy <ID>
+```

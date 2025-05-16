@@ -12,7 +12,7 @@ Ziti Service Policy Resource
 ## Example Usage
 
 ```terraform
-resource "ziti_service_policy" "test_service1" {
+resource "ziti_service_policy" "test_service_policy" {
   name              = "test_service_policy"
   identityroles     = ["#test"]
   serviceroles      = ["#test"]
@@ -45,3 +45,12 @@ resource "ziti_service_policy" "test_service1" {
 
 - `id` (String) Identifier
 - `last_updated` (String) Last Updated Time
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# service policy can be imported by specifying the identifier.
+terraform import ziti_service_policy.test_service_policy <ID>
+```

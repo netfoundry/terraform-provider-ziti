@@ -38,3 +38,12 @@ resource "ziti_edge_router_policy" "test1" {
 
 - `id` (String) Identifier
 - `last_updated` (String) Last Updated Time
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# edge router policy can be imported by specifying the identifier.
+terraform import ziti_edge_router_policy.test1 <ID>
+```
