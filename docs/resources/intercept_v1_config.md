@@ -68,3 +68,12 @@ Required:
 
 - `high` (Number)
 - `low` (Number)
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# intercept config can be imported by specifying the identifier.
+terraform import ziti_intercept_v1_config.test_intercept_v1_config <ID>
+```

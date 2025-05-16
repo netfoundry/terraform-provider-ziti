@@ -52,3 +52,12 @@ resource "ziti_identity" "test1" {
 
 - `id` (String) Identifier
 - `last_updated` (String) Last Updated Time
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# identity can be imported by specifying the identifier.
+terraform import ziti_identity.test1 <ID>
+```
