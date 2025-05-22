@@ -7,7 +7,7 @@ description: |-
 
 # ziti_identity (Resource)
 
-Ziti Identity Resource
+Ziti Identity Resource, ott type enrollment
 
 ## Example Usage
 

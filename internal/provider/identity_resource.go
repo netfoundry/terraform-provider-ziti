@@ -84,7 +84,7 @@ type identityResourceModel struct {
 // Schema defines the schema for the resource.
 func (r *identityResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Ziti Identity Resource",
+		MarkdownDescription: "Ziti Identity Resource, ott type enrollment",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true,
@@ -202,6 +202,9 @@ func (r *identityResource) Create(ctx context.Context, req resource.CreateReques
 
 	appData := TagsFromAttributes(eplan.AppData.Elements())
 	tags := TagsFromAttributes(eplan.Tags.Elements())
+	enrollment := &rest_model.IdentityCreateEnrollment{
+		Ott: true,
+	}
 	name := eplan.Name.ValueString()
 	authPolicyId := eplan.AuthPolicyID.ValueString()
 	defaultHostingCost := rest_model.TerminatorCost(eplan.DefaultHostingCost.ValueInt64())
@@ -236,6 +239,7 @@ func (r *identityResource) Create(ctx context.Context, req resource.CreateReques
 		ServiceHostingCosts:       serviceHostingCosts,
 		ServiceHostingPrecedences: serviceHostingPrecedences,
 		Tags:                      tags,
+		Enrollment:                enrollment,
 		Type:                      &type_,
 	}
 
