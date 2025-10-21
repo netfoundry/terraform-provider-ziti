@@ -11,3 +11,8 @@ resource "ziti_identity" "test1" {
   default_hosting_cost = 65
   is_admin             = true
 }
+
+output "ziti_identity_token" {
+  value     = ziti_identity.test1.enrollment_token
+  sensitive = true
+}

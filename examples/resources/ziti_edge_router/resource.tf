@@ -12,3 +12,8 @@ resource "ziti_edge_router" "test_edge_router" {
   is_tunnelerenabled = false
   no_traversal       = true
 }
+
+output "ziti_router_token" {
+  value     = ziti_edge_router.test_edge_router.enrollment_token
+  sensitive = true
+}
