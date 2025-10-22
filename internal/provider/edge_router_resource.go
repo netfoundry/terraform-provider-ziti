@@ -72,6 +72,7 @@ type edgeRouterResourceModel struct {
 	Tags              types.Map    `tfsdk:"tags"`
 	AppData           types.Map    `tfsdk:"app_data"`
 	LastUpdated       types.String `tfsdk:"last_updated"`
+	EnrollmentJwt     types.String `tfsdk:"enrollment_token"`
 }
 
 // Schema defines the schema for the resource.
@@ -136,6 +137,15 @@ func (r *edgeRouterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Default:             mapdefault.StaticValue(types.MapNull(types.StringType)),
 				MarkdownDescription: "App Data of Edge Router",
 			},
+			"enrollment_token": schema.StringAttribute{
+				Computed:  true,
+				Optional:  true,
+				Sensitive: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "The JWT token for one-time enrollment (OTT).",
+			},
 		},
 	}
 }
@@ -196,6 +206,34 @@ func (r *edgeRouterResource) Create(ctx context.Context, req resource.CreateRequ
 
 	// Map response body to schema and populate Computed attribute values
 	eplan.ID = types.StringValue(resourceID)
+
+	// Poll router endpoint to get JWT
+	maxRetries := 10
+	var jwtToken string
+
+	for i := 0; i < maxRetries; i++ {
+		time.Sleep(5 * time.Second) // wait between retries
+
+		jwtUrl := fmt.Sprintf("%s/edge-routers/%s", r.resourceConfig.host, resourceID)
+		respBody, err := ReadZitiResource(jwtUrl, r.resourceConfig.apiToken)
+		if err != nil {
+			continue
+		}
+
+		// Use gjson to extract the JWT
+		jwt := gjson.Get(respBody, "data.enrollmentJwt").String()
+		if jwt != "" {
+			jwtToken = jwt
+			break
+		}
+	}
+
+	if jwtToken == "" {
+		resp.Diagnostics.AddError("Error Fetching JWT", "Timeout while waiting for JWT to be available")
+		return
+	}
+
+	eplan.EnrollmentJwt = types.StringValue(jwtToken)
 	eplan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Set state to fully populated data
@@ -357,6 +395,7 @@ func (r *edgeRouterResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	eplan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	eplan.EnrollmentJwt = state.EnrollmentJwt
 
 	diags = resp.State.Set(ctx, eplan)
 	resp.Diagnostics.Append(diags...)
