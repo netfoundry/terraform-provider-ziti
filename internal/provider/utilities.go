@@ -17,6 +17,11 @@ import (
 	"github.com/openziti/edge-api/rest_model"
 )
 
+func IsNotFoundError(err error) bool {
+    s := strings.ToLower(err.Error())
+    return strings.Contains(s, "not_found") || strings.Contains(s, "404") || strings.Contains(s, "not found")
+}
+
 func sortAttributes(ctx context.Context, listItems types.List) types.List {
 	// Get the elements from the attributes
 	var attrStrings []string

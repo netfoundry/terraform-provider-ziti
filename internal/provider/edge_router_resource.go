@@ -260,6 +260,12 @@ func (r *edgeRouterResource) Read(ctx context.Context, req resource.ReadRequest,
 	msg := fmt.Sprintf("Ziti GET Response: %s", cresp)
 	log.Info().Msg(msg)
 	if err != nil {
+		if cresp == "" || IsNotFoundError(err) {
+			msg := fmt.Sprintf("Resource not found in backend; removing from state, id: %s", state.ID.ValueString())
+			log.Info().Msg(msg)
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error Reading edge-routers", "Could not READ edge-routers, unexpected error: "+err.Error(),
 		)
