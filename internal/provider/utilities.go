@@ -17,9 +17,36 @@ import (
 	"github.com/openziti/edge-api/rest_model"
 )
 
+func FormatMaybeRawMAC(s string) string {
+	// Remove any non-hex characters (like colons, dashes, dots)
+	hexOnly := ""
+	for _, c := range s {
+		if (c >= '0' && c <= '9') ||
+			(c >= 'a' && c <= 'f') ||
+			(c >= 'A' && c <= 'F') {
+			hexOnly += string(c)
+		}
+	}
+
+	if len(hexOnly)%2 == 0 {
+		// Build colon-separated MAC
+		var b strings.Builder
+		for i := 0; i < len(hexOnly); i += 2 {
+			if i > 0 {
+				b.WriteByte(':')
+			}
+			b.WriteString(hexOnly[i : i+2])
+		}
+		return strings.ToLower(b.String())
+	}
+
+	// Otherwise, just lowercase whatever we got
+	return strings.ToLower(s)
+}
+
 func IsNotFoundError(err error) bool {
-    s := strings.ToLower(err.Error())
-    return strings.Contains(s, "not_found") || strings.Contains(s, "404") || strings.Contains(s, "not found")
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "not_found") || strings.Contains(s, "404") || strings.Contains(s, "not found")
 }
 
 func sortAttributes(ctx context.Context, listItems types.List) types.List {

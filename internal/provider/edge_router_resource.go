@@ -185,10 +185,9 @@ func (r *edgeRouterResource) Create(ctx context.Context, req resource.CreateRequ
 		AppData:           appData,
 	}
 
-	fmt.Printf("**********************create resource payload***********************:\n %s\n", payload)
-
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
+	fmt.Printf("**********************create resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/edge-routers", r.resourceConfig.host)
 	cresp, err := CreateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
@@ -384,10 +383,10 @@ func (r *edgeRouterResource) Update(ctx context.Context, req resource.UpdateRequ
 		Tags:              tags,
 		AppData:           appData,
 	}
-	fmt.Printf("**********************update resource payload***********************:\n %s\n", payload)
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
+	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/edge-routers/%s", r.resourceConfig.host, state.ID.ValueString())
 	cresp, err := UpdateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)

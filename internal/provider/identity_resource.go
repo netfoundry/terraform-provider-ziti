@@ -253,9 +253,9 @@ func (r *identityResource) Create(ctx context.Context, req resource.CreateReques
 		Type:                      &type_,
 	}
 
-	fmt.Printf("**********************create resource payload***********************:\n %s\n", payload)
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
+	fmt.Printf("**********************create resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/identities", r.resourceConfig.host)
 	cresp, err := CreateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
@@ -499,9 +499,9 @@ func (r *identityResource) Update(ctx context.Context, req resource.UpdateReques
 		Type:                      &type_,
 	}
 
-	fmt.Printf("**********************update resource payload***********************:\n %s\n", payload)
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
+	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/identities/%s", r.resourceConfig.host, eplan.ID.ValueString())
 	cresp, err := UpdateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
