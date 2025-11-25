@@ -316,10 +316,9 @@ func (r *interceptV1ConfigResource) Create(ctx context.Context, req resource.Cre
 		Tags:         tags,
 	}
 
-	fmt.Printf("**********************create resource payload***********************:\n %s\n", payload)
-
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
+	fmt.Printf("**********************create resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/configs", r.resourceConfig.host)
 	cresp, err := CreateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
@@ -460,10 +459,10 @@ func (r *interceptV1ConfigResource) Update(ctx context.Context, req resource.Upd
 		Data: requestObject,
 		Tags: tags,
 	}
-	fmt.Printf("**********************update resource payload***********************:\n %s\n", payload)
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
+	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/configs/%s", r.resourceConfig.host, state.ID.ValueString())
 	cresp, err := UpdateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)

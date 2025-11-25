@@ -190,10 +190,9 @@ func (r *servicePolicyResource) Create(ctx context.Context, req resource.CreateR
 		Type:              &type_,
 	}
 
-	fmt.Printf("**********************create resource payload***********************:\n %s\n", payload)
-
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
+	fmt.Printf("**********************create resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/service-policies", r.resourceConfig.host)
 	cresp, err := CreateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
@@ -375,10 +374,10 @@ func (r *servicePolicyResource) Update(ctx context.Context, req resource.UpdateR
 		Tags:              tags,
 		Type:              &type_,
 	}
-	fmt.Printf("**********************update resource payload***********************:\n %s\n", payload)
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
+	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/service-policies/%s", r.resourceConfig.host, state.ID.ValueString())
 	cresp, err := UpdateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)

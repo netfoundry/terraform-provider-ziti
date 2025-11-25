@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -13,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -25,23 +26,23 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &edgeRouterPolicyResource{}
-	_ resource.ResourceWithConfigure   = &edgeRouterPolicyResource{}
-	_ resource.ResourceWithImportState = &edgeRouterPolicyResource{}
+	_ resource.Resource                = &postureCheckMacResource{}
+	_ resource.ResourceWithConfigure   = &postureCheckMacResource{}
+	_ resource.ResourceWithImportState = &postureCheckMacResource{}
 )
 
-// NewEdgeRouterPolicyResource is a helper function to simplify the provider implementation.
-func NewEdgeRouterPolicyResource() resource.Resource {
-	return &edgeRouterPolicyResource{}
+// NewPostureCheckMacResource is a helper function to simplify the provider implementation.
+func NewPostureCheckMacResource() resource.Resource {
+	return &postureCheckMacResource{}
 }
 
-// edgeRouterPolicyResource is the resource implementation.
-type edgeRouterPolicyResource struct {
+// postureCheckMacResource is the resource implementation.
+type postureCheckMacResource struct {
 	resourceConfig *zitiData
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *edgeRouterPolicyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *postureCheckMacResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Add a nil check when handling ProviderData because Terraform
 	// sets that data after it calls the ConfigureProvider RPC.
 	if req.ProviderData == nil {
@@ -56,25 +57,32 @@ func (r *edgeRouterPolicyResource) Configure(_ context.Context, req resource.Con
 }
 
 // Metadata returns the resource type name.
-func (r *edgeRouterPolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_edge_router_policy"
+func (r *postureCheckMacResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_posture_check_mac_addresses"
 }
 
-// edgeRouterPolicyResourceModel maps the resource schema data.
-type edgeRouterPolicyResourceModel struct {
-	ID              types.String `tfsdk:"id"`
-	Name            types.String `tfsdk:"name"`
-	Semantic        types.String `tfsdk:"semantic"`
-	EdgeRouterRoles types.List   `tfsdk:"edgerouterroles"`
-	IdentityRoles   types.List   `tfsdk:"identityroles"`
-	Tags            types.Map    `tfsdk:"tags"`
-	LastUpdated     types.String `tfsdk:"last_updated"`
+// postureCheckMacResourceModel maps the resource schema data.
+type postureCheckMacResourceModel struct {
+	ID             types.String `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	RoleAttributes types.List   `tfsdk:"role_attributes"`
+	MacAddresses   types.List   `tfsdk:"mac_addresses"`
+	Tags           types.Map    `tfsdk:"tags"`
+	LastUpdated    types.String `tfsdk:"last_updated"`
+}
+
+type postureCheckMacAddressPayload struct {
+	Name           *string                     `json:"name"`
+	RoleAttributes rest_model.Attributes       `json:"roleAttributes,omitempty"`
+	TypeID         rest_model.PostureCheckType `json:"typeId"`
+	MacAddresses   []string                    `json:"macAddresses"`
+	Tags           *rest_model.Tags            `json:"tags,omitempty"`
 }
 
 // Schema defines the schema for the resource.
-func (r *edgeRouterPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *postureCheckMacResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Ziti Edge Router Policy Resource",
+		MarkdownDescription: "Ziti Posture check Resource, Type: MAC Address check",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true,
@@ -89,46 +97,43 @@ func (r *edgeRouterPolicyResource) Schema(_ context.Context, _ resource.SchemaRe
 			},
 			"name": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "Name of the edge router policy",
+				MarkdownDescription: "Name of the Posture Check",
 			},
-			"semantic": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  stringdefault.StaticString("AllOf"),
-				Validators: []validator.String{
-					stringvalidator.OneOf("AnyOf", "AllOf"),
+			"role_attributes": schema.ListAttribute{
+				Computed:            true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
+				MarkdownDescription: "Role Attributes",
+			},
+			"mac_addresses": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Required:            true,
+				MarkdownDescription: "MAC address list",
+				Validators: []validator.List{
+					listvalidator.ValueStringsAre(
+						stringvalidator.RegexMatches(
+							regexp.MustCompile(`^[0-9a-f]{2}(?::[0-9a-f]{2})*$`),
+							"must consist of hex pairs (0-9, a-f) separated by ':'",
+						),
+					),
 				},
-				MarkdownDescription: "Semantic Value",
-			},
-			"edgerouterroles": schema.ListAttribute{
-				ElementType:         types.StringType,
-				Optional:            true,
-				Computed:            true,
-				Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
-				MarkdownDescription: "Edge Router Roles",
-			},
-			"identityroles": schema.ListAttribute{
-				ElementType:         types.StringType,
-				Optional:            true,
-				Computed:            true,
-				Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
-				MarkdownDescription: "Identity Roles",
 			},
 			"tags": schema.MapAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
 				Optional:            true,
 				Default:             mapdefault.StaticValue(types.MapNull(types.StringType)),
-				MarkdownDescription: "Edge Router Policy Tags",
+				MarkdownDescription: "Posture Check Tags",
 			},
 		},
 	}
 }
 
 // Create a new resource.
-func (r *edgeRouterPolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *postureCheckMacResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	var eplan edgeRouterPolicyResourceModel
+	var eplan postureCheckMacResourceModel
 
 	diags := req.Plan.Get(ctx, &eplan)
 	resp.Diagnostics.Append(diags...)
@@ -137,42 +142,41 @@ func (r *edgeRouterPolicyResource) Create(ctx context.Context, req resource.Crea
 	}
 
 	name := eplan.Name.ValueString()
-	semantic := rest_model.Semantic(eplan.Semantic.ValueString())
 	tags := TagsFromAttributes(eplan.Tags.Elements())
 
-	var edgeRouterRoles rest_model.Roles
-	for _, value := range eplan.EdgeRouterRoles.Elements() {
-		if edgeRouterRole, ok := value.(types.String); ok {
-			edgeRouterRoles = append(edgeRouterRoles, edgeRouterRole.ValueString())
+	var macAddresses []string
+	for _, value := range eplan.MacAddresses.Elements() {
+		if macAddress, ok := value.(types.String); ok {
+			macAddresses = append(macAddresses, macAddress.ValueString())
 		}
 	}
 
-	var identityRoles rest_model.Roles
-	for _, value := range eplan.IdentityRoles.Elements() {
-		if identityRole, ok := value.(types.String); ok {
-			identityRoles = append(identityRoles, identityRole.ValueString())
+	var roleAttributes rest_model.Attributes
+	for _, value := range eplan.RoleAttributes.Elements() {
+		if roleAttribute, ok := value.(types.String); ok {
+			roleAttributes = append(roleAttributes, roleAttribute.ValueString())
 		}
 	}
 
-	payload := rest_model.EdgeRouterPolicyCreate{
-		EdgeRouterRoles: edgeRouterRoles,
-		Name:            &name,
-		Semantic:        &semantic,
-		IdentityRoles:   identityRoles,
-		Tags:            tags,
+	payload := postureCheckMacAddressPayload{
+		MacAddresses:   macAddresses,
+		Name:           &name,
+		TypeID:         "MAC",
+		RoleAttributes: roleAttributes,
+		Tags:           tags,
 	}
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************create resource payload***********************:\n %s\n", jsonData)
+	fmt.Printf("**********************create resource payload***********************:\n %+v\n", jsonData)
 
-	authUrl := fmt.Sprintf("%s/edge-router-policies", r.resourceConfig.host)
+	authUrl := fmt.Sprintf("%s/posture-checks", r.resourceConfig.host)
 	cresp, err := CreateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
 	msg := fmt.Sprintf("Ziti POST Response: %s", cresp)
 	log.Info().Msg(msg)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Creating ERP", "Could not Create ERP, unexpected error: "+err.Error(),
+			"Error Creating posture check", "Could not Create posture check, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -193,17 +197,17 @@ func (r *edgeRouterPolicyResource) Create(ctx context.Context, req resource.Crea
 }
 
 // Read resource information.
-func (r *edgeRouterPolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *postureCheckMacResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
-	var state edgeRouterPolicyResourceModel
-	tflog.Debug(ctx, "Reading Edge Router Policy")
+	var state postureCheckMacResourceModel
+	tflog.Debug(ctx, "Reading Posture check")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	authUrl := fmt.Sprintf("%s/edge-router-policies/%s", r.resourceConfig.host, state.ID.ValueString())
+	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, state.ID.ValueString())
 	cresp, err := ReadZitiResource(authUrl, r.resourceConfig.apiToken)
 	msg := fmt.Sprintf("Ziti GET Response: %s", cresp)
 	log.Info().Msg(msg)
@@ -215,7 +219,7 @@ func (r *edgeRouterPolicyResource) Read(ctx context.Context, req resource.ReadRe
 			return
 		}
 		resp.Diagnostics.AddError(
-			"Error Reading ERP", "Could not READ ERP, unexpected error: "+err.Error(),
+			"Error Reading posture check", "Could not READ posture check, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -223,9 +227,8 @@ func (r *edgeRouterPolicyResource) Read(ctx context.Context, req resource.ReadRe
 	var jsonBody map[string]interface{}
 	err = json.Unmarshal([]byte(cresp), &jsonBody)
 	if err != nil {
-		// Handle error
 		resp.Diagnostics.AddError(
-			"Error Reading edge router policy", fmt.Sprintf("Could not READ edge router policy, ERROR %v: ", err.Error()),
+			"Error Reading posture check", fmt.Sprintf("Could not READ posture check, ERROR %v: ", err.Error()),
 		)
 		return
 	}
@@ -242,24 +245,30 @@ func (r *edgeRouterPolicyResource) Read(ctx context.Context, req resource.ReadRe
 	// Manually assign individual values from the map to the struct fields
 	state.Name = types.StringValue(data["name"].(string))
 
-	if semanticValue, ok := data["semantic"].(string); ok {
-		state.Semantic = types.StringValue(semanticValue)
+	if macAddresses, ok := data["macAddresses"].([]interface{}); ok {
+		// Normalize all MAC addresses first
+		normalized := make([]string, len(macAddresses))
+		for i, m := range macAddresses {
+			str, ok := m.(string)
+			if !ok {
+				// handle error if the element is not a string
+				normalized[i] = ""
+				continue
+			}
+			normalized[i] = FormatMaybeRawMAC(str)
+		}
+
+		macList, diag := types.ListValueFrom(ctx, types.StringType, normalized)
+		resp.Diagnostics = append(resp.Diagnostics, diag...)
+		state.MacAddresses = macList
 	}
 
-	if edgeRouterRoles, ok := data["edgeRouterRoles"].([]interface{}); ok {
-		edgeRouterRoles, diag := types.ListValueFrom(ctx, types.StringType, edgeRouterRoles)
+	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {
+		roleAttributes, diag := types.ListValueFrom(ctx, types.StringType, roleAttributes)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
-		state.EdgeRouterRoles = edgeRouterRoles
+		state.RoleAttributes = roleAttributes
 	} else {
-		state.EdgeRouterRoles = types.ListNull(types.StringType)
-	}
-
-	if identityRoles, ok := data["identityRoles"].([]interface{}); ok {
-		identityRoles, diag := types.ListValueFrom(ctx, types.StringType, identityRoles)
-		resp.Diagnostics = append(resp.Diagnostics, diag...)
-		state.IdentityRoles = identityRoles
-	} else {
-		state.IdentityRoles = types.ListNull(types.StringType)
+		state.RoleAttributes = types.ListNull(types.StringType)
 	}
 
 	if _tags, ok := data["tags"].(map[string]interface{}); ok {
@@ -281,10 +290,10 @@ func (r *edgeRouterPolicyResource) Read(ctx context.Context, req resource.ReadRe
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func (r *edgeRouterPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *postureCheckMacResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
-	var eplan edgeRouterPolicyResourceModel
-	tflog.Debug(ctx, "Updating Edge Router Policy")
+	var eplan postureCheckMacResourceModel
+	tflog.Debug(ctx, "Updating Posture check")
 	diags := req.Plan.Get(ctx, &eplan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -292,7 +301,7 @@ func (r *edgeRouterPolicyResource) Update(ctx context.Context, req resource.Upda
 	}
 
 	// Get current state
-	var state edgeRouterPolicyResourceModel
+	var state postureCheckMacResourceModel
 	sdiags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(sdiags...)
 	if resp.Diagnostics.HasError() {
@@ -300,42 +309,41 @@ func (r *edgeRouterPolicyResource) Update(ctx context.Context, req resource.Upda
 	}
 
 	name := eplan.Name.ValueString()
-	semantic := rest_model.Semantic(eplan.Semantic.ValueString())
 	tags := TagsFromAttributes(eplan.Tags.Elements())
 
-	var edgeRouterRoles rest_model.Roles
-	for _, value := range eplan.EdgeRouterRoles.Elements() {
-		if edgeRouterRole, ok := value.(types.String); ok {
-			edgeRouterRoles = append(edgeRouterRoles, edgeRouterRole.ValueString())
+	var macAddresses []string
+	for _, value := range eplan.MacAddresses.Elements() {
+		if macAddress, ok := value.(types.String); ok {
+			macAddresses = append(macAddresses, macAddress.ValueString())
 		}
 	}
 
-	var identityRoles rest_model.Roles
-	for _, value := range eplan.IdentityRoles.Elements() {
-		if identityRole, ok := value.(types.String); ok {
-			identityRoles = append(identityRoles, identityRole.ValueString())
+	var roleAttributes rest_model.Attributes
+	for _, value := range eplan.RoleAttributes.Elements() {
+		if roleAttribute, ok := value.(types.String); ok {
+			roleAttributes = append(roleAttributes, roleAttribute.ValueString())
 		}
 	}
 
-	payload := rest_model.EdgeRouterPolicyUpdate{
-		EdgeRouterRoles: edgeRouterRoles,
-		Name:            &name,
-		Semantic:        &semantic,
-		IdentityRoles:   identityRoles,
-		Tags:            tags,
+	payload := postureCheckMacAddressPayload{
+		MacAddresses:   macAddresses,
+		Name:           &name,
+		TypeID:         "MAC",
+		RoleAttributes: roleAttributes,
+		Tags:           tags,
 	}
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
+	fmt.Printf("**********************update resource payload***********************:\n %+v\n", jsonData)
 
-	authUrl := fmt.Sprintf("%s/edge-router-policies/%s", r.resourceConfig.host, state.ID.ValueString())
-	cresp, err := UpdateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
-	msg := fmt.Sprintf("Ziti PUT Response: %s", cresp)
+	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, state.ID.ValueString())
+	cresp, err := PatchZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
+	msg := fmt.Sprintf("Ziti PATCH Response: %s", cresp)
 	log.Info().Msg(msg)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Updating ERP", "Could not Update ERP, unexpected error: "+err.Error(),
+			"Error Updating posture check", "Could not Update posture check, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -350,30 +358,30 @@ func (r *edgeRouterPolicyResource) Update(ctx context.Context, req resource.Upda
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *edgeRouterPolicyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *postureCheckMacResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
-	var state edgeRouterPolicyResourceModel
-	tflog.Debug(ctx, "Deleting Edge Router Policy")
+	var state postureCheckMacResourceModel
+	tflog.Debug(ctx, "Deleting Posture check")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	authUrl := fmt.Sprintf("%s/edge-router-policies/%s", r.resourceConfig.host, state.ID.ValueString())
+	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, state.ID.ValueString())
 
 	cresp, err := DeleteZitiResource(authUrl, r.resourceConfig.apiToken)
 	msg := fmt.Sprintf("Ziti Delete Response: %s", cresp)
 	log.Info().Msg(msg)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Deleting ERP", "Could not DELETE ERP, unexpected error: "+err.Error(),
+			"Error Deleting posture check", "Could not DELETE posture check, unexpected error: "+err.Error(),
 		)
 		return
 	}
 }
 
-func (r *edgeRouterPolicyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *postureCheckMacResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
