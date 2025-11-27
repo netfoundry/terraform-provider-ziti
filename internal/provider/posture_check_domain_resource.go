@@ -7,18 +7,13 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/openziti/edge-api/rest_model"
@@ -28,23 +23,23 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &serviceResource{}
-	_ resource.ResourceWithConfigure   = &serviceResource{}
-	_ resource.ResourceWithImportState = &serviceResource{}
+	_ resource.Resource                = &postureCheckDomainResource{}
+	_ resource.ResourceWithConfigure   = &postureCheckDomainResource{}
+	_ resource.ResourceWithImportState = &postureCheckDomainResource{}
 )
 
-// NewServiceResource is a helper function to simplify the provider implementation.
-func NewServiceResource() resource.Resource {
-	return &serviceResource{}
+// NewPostureCheckDomainResource is a helper function to simplify the provider implementation.
+func NewPostureCheckDomainResource() resource.Resource {
+	return &postureCheckDomainResource{}
 }
 
-// serviceResource is the resource implementation.
-type serviceResource struct {
+// postureCheckDomainResource is the resource implementation.
+type postureCheckDomainResource struct {
 	resourceConfig *zitiData
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *serviceResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *postureCheckDomainResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Add a nil check when handling ProviderData because Terraform
 	// sets that data after it calls the ConfigureProvider RPC.
 	if req.ProviderData == nil {
@@ -59,27 +54,32 @@ func (r *serviceResource) Configure(_ context.Context, req resource.ConfigureReq
 }
 
 // Metadata returns the resource type name.
-func (r *serviceResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_service"
+func (r *postureCheckDomainResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_posture_check_domains"
 }
 
-// serviceResourceModel maps the resource schema data.
-type serviceResourceModel struct {
-	ID                      types.String `tfsdk:"id"`
-	Name                    types.String `tfsdk:"name"`
-	Configs                 types.List   `tfsdk:"configs"`
-	EncryptionRequired      types.Bool   `tfsdk:"encryption_required"`
-	MaxIdleTimeMilliseconds types.Int64  `tfsdk:"max_idle_milliseconds"`
-	RoleAttributes          types.List   `tfsdk:"role_attributes"`
-	TerminatorStrategy      types.String `tfsdk:"terminator_strategy"`
-	Tags                    types.Map    `tfsdk:"tags"`
-	LastUpdated             types.String `tfsdk:"last_updated"`
+// postureCheckDomainResourceModel maps the resource schema data.
+type postureCheckDomainResourceModel struct {
+	ID             types.String `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	RoleAttributes types.List   `tfsdk:"role_attributes"`
+	Domains        types.List   `tfsdk:"domains"`
+	Tags           types.Map    `tfsdk:"tags"`
+	LastUpdated    types.String `tfsdk:"last_updated"`
+}
+
+type postureCheckDomainPayload struct {
+	Name           *string                     `json:"name"`
+	RoleAttributes rest_model.Attributes       `json:"roleAttributes,omitempty"`
+	TypeID         rest_model.PostureCheckType `json:"typeId"`
+	Domains        []string                    `json:"domains"`
+	Tags           *rest_model.Tags            `json:"tags,omitempty"`
 }
 
 // Schema defines the schema for the resource.
-func (r *serviceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *postureCheckDomainResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Ziti Service Resource",
+		MarkdownDescription: "Ziti Posture check Resource, Type: Windows Domains check",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true,
@@ -94,7 +94,7 @@ func (r *serviceResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"name": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "Name of the Service",
+				MarkdownDescription: "Name of the Posture Check",
 			},
 			"role_attributes": schema.ListAttribute{
 				Computed:            true,
@@ -103,49 +103,26 @@ func (r *serviceResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
 				MarkdownDescription: "Role Attributes",
 			},
-			"terminator_strategy": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  stringdefault.StaticString("smartrouting"),
-				Validators: []validator.String{
-					stringvalidator.OneOf("smartrouting", "weighted", "random", "ha"),
-				},
-				MarkdownDescription: "Type of Terminator Strategy",
-			},
-			"max_idle_milliseconds": schema.Int64Attribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             int64default.StaticInt64(0),
-				MarkdownDescription: "Idle Timeout in milli seconds",
-			},
-			"encryption_required": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(true),
-				MarkdownDescription: "Flag which controls Encryption Required",
-			},
-			"configs": schema.ListAttribute{
+			"domains": schema.ListAttribute{
 				ElementType:         types.StringType,
-				Optional:            true,
-				Computed:            true,
-				Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
-				MarkdownDescription: "Service Configs",
+				Required:            true,
+				MarkdownDescription: "Windows Domains list",
 			},
 			"tags": schema.MapAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
 				Optional:            true,
 				Default:             mapdefault.StaticValue(types.MapNull(types.StringType)),
-				MarkdownDescription: "Service Tags",
+				MarkdownDescription: "Posture Check Tags",
 			},
 		},
 	}
 }
 
 // Create a new resource.
-func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *postureCheckDomainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	var eplan serviceResourceModel
+	var eplan postureCheckDomainResourceModel
 
 	diags := req.Plan.Get(ctx, &eplan)
 	resp.Diagnostics.Append(diags...)
@@ -154,15 +131,12 @@ func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	name := eplan.Name.ValueString()
-	encryptionRequired := eplan.EncryptionRequired.ValueBool()
-	maxIdleMilliseconds := eplan.MaxIdleTimeMilliseconds.ValueInt64()
 	tags := TagsFromAttributes(eplan.Tags.Elements())
-	terminatorStrategy := eplan.TerminatorStrategy.ValueString()
 
-	var configs []string
-	for _, value := range eplan.Configs.Elements() {
-		if config, ok := value.(types.String); ok {
-			configs = append(configs, config.ValueString())
+	var domainAddresses []string
+	for _, value := range eplan.Domains.Elements() {
+		if domainAddress, ok := value.(types.String); ok {
+			domainAddresses = append(domainAddresses, domainAddress.ValueString())
 		}
 	}
 
@@ -173,27 +147,25 @@ func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest
 		}
 	}
 
-	payload := rest_model.ServiceCreate{
-		Configs:            configs,
-		EncryptionRequired: &encryptionRequired,
-		MaxIdleTimeMillis:  maxIdleMilliseconds,
-		Name:               &name,
-		RoleAttributes:     roleAttributes,
-		TerminatorStrategy: terminatorStrategy,
-		Tags:               tags,
+	payload := postureCheckDomainPayload{
+		Domains:        domainAddresses,
+		Name:           &name,
+		TypeID:         "DOMAIN",
+		RoleAttributes: roleAttributes,
+		Tags:           tags,
 	}
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************create resource payload***********************:\n %s\n", jsonData)
+	fmt.Printf("**********************create resource payload***********************:\n %+v\n", jsonData)
 
-	authUrl := fmt.Sprintf("%s/services", r.resourceConfig.host)
+	authUrl := fmt.Sprintf("%s/posture-checks", r.resourceConfig.host)
 	cresp, err := CreateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
 	msg := fmt.Sprintf("Ziti POST Response: %s", cresp)
 	log.Info().Msg(msg)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Creating services", "Could not Create services, unexpected error: "+err.Error(),
+			"Error Creating posture check", "Could not Create posture check, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -214,17 +186,17 @@ func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest
 }
 
 // Read resource information.
-func (r *serviceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *postureCheckDomainResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
-	var state serviceResourceModel
-	tflog.Debug(ctx, "Reading Service")
+	var state postureCheckDomainResourceModel
+	tflog.Debug(ctx, "Reading Posture check")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	authUrl := fmt.Sprintf("%s/services/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
+	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 	cresp, err := ReadZitiResource(authUrl, r.resourceConfig.apiToken)
 	msg := fmt.Sprintf("Ziti GET Response: %s", cresp)
 	log.Info().Msg(msg)
@@ -236,7 +208,7 @@ func (r *serviceResource) Read(ctx context.Context, req resource.ReadRequest, re
 			return
 		}
 		resp.Diagnostics.AddError(
-			"Error Reading services", "Could not READ services, unexpected error: "+err.Error(),
+			"Error Reading posture check", "Could not READ posture check, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -244,9 +216,8 @@ func (r *serviceResource) Read(ctx context.Context, req resource.ReadRequest, re
 	var jsonBody map[string]interface{}
 	err = json.Unmarshal([]byte(cresp), &jsonBody)
 	if err != nil {
-		// Handle error
 		resp.Diagnostics.AddError(
-			"Error Reading services", fmt.Sprintf("Could not READ services, ERROR %v: ", err.Error()),
+			"Error Reading posture check", fmt.Sprintf("Could not READ posture check, ERROR %v: ", err.Error()),
 		)
 		return
 	}
@@ -263,24 +234,10 @@ func (r *serviceResource) Read(ctx context.Context, req resource.ReadRequest, re
 	// Manually assign individual values from the map to the struct fields
 	state.Name = types.StringValue(data["name"].(string))
 
-	if terminatorStrategy, ok := data["terminatorStrategy"].(string); ok {
-		state.TerminatorStrategy = types.StringValue(terminatorStrategy)
-	}
-
-	if maxIdleTimeMilliseconds, ok := data["maxIdleTimeMillis"].(float64); ok {
-		state.MaxIdleTimeMilliseconds = types.Int64Value(int64(maxIdleTimeMilliseconds))
-	}
-
-	if encryptionRequired, ok := data["encryptionRequired"].(bool); ok {
-		state.EncryptionRequired = types.BoolValue(encryptionRequired)
-	}
-
-	if configs, ok := data["configs"].([]interface{}); ok {
-		configs, diag := types.ListValueFrom(ctx, types.StringType, configs)
+	if domainAddresses, ok := data["domains"].([]interface{}); ok {
+		domainAddresses, diag := types.ListValueFrom(ctx, types.StringType, domainAddresses)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
-		state.Configs = configs
-	} else {
-		state.Configs = types.ListNull(types.StringType)
+		state.Domains = domainAddresses
 	}
 
 	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {
@@ -310,10 +267,10 @@ func (r *serviceResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *postureCheckDomainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
-	var eplan serviceResourceModel
-	tflog.Debug(ctx, "Updating Service")
+	var eplan postureCheckDomainResourceModel
+	tflog.Debug(ctx, "Updating Posture check")
 	diags := req.Plan.Get(ctx, &eplan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -321,7 +278,7 @@ func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	// Get current state
-	var state serviceResourceModel
+	var state postureCheckDomainResourceModel
 	sdiags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(sdiags...)
 	if resp.Diagnostics.HasError() {
@@ -329,15 +286,12 @@ func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	name := eplan.Name.ValueString()
-	encryptionRequired := eplan.EncryptionRequired.ValueBool()
-	maxIdleMilliseconds := eplan.MaxIdleTimeMilliseconds.ValueInt64()
 	tags := TagsFromAttributes(eplan.Tags.Elements())
-	terminatorStrategy := eplan.TerminatorStrategy.ValueString()
 
-	var configs []string
-	for _, value := range eplan.Configs.Elements() {
-		if config, ok := value.(types.String); ok {
-			configs = append(configs, config.ValueString())
+	var domainAddresses []string
+	for _, value := range eplan.Domains.Elements() {
+		if domainAddress, ok := value.(types.String); ok {
+			domainAddresses = append(domainAddresses, domainAddress.ValueString())
 		}
 	}
 
@@ -348,27 +302,25 @@ func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest
 		}
 	}
 
-	payload := rest_model.ServiceUpdate{
-		Configs:            configs,
-		EncryptionRequired: encryptionRequired,
-		MaxIdleTimeMillis:  maxIdleMilliseconds,
-		Name:               &name,
-		RoleAttributes:     roleAttributes,
-		TerminatorStrategy: terminatorStrategy,
-		Tags:               tags,
+	payload := postureCheckDomainPayload{
+		Domains:        domainAddresses,
+		Name:           &name,
+		TypeID:         "DOMAIN",
+		RoleAttributes: roleAttributes,
+		Tags:           tags,
 	}
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
+	fmt.Printf("**********************update resource payload***********************:\n %+v\n", jsonData)
 
-	authUrl := fmt.Sprintf("%s/services/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
-	cresp, err := UpdateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
-	msg := fmt.Sprintf("Ziti PUT Response: %s", cresp)
+	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
+	cresp, err := PatchZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
+	msg := fmt.Sprintf("Ziti PATCH Response: %s", cresp)
 	log.Info().Msg(msg)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Updating services", "Could not Update services, unexpected error: "+err.Error(),
+			"Error Updating posture check", "Could not Update posture check, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -383,30 +335,30 @@ func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *serviceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *postureCheckDomainResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
-	var state serviceResourceModel
-	tflog.Debug(ctx, "Deleting Service")
+	var state postureCheckDomainResourceModel
+	tflog.Debug(ctx, "Deleting Posture check")
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	authUrl := fmt.Sprintf("%s/services/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
+	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 
 	cresp, err := DeleteZitiResource(authUrl, r.resourceConfig.apiToken)
 	msg := fmt.Sprintf("Ziti Delete Response: %s", cresp)
 	log.Info().Msg(msg)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Deleting services", "Could not DELETE services, unexpected error: "+err.Error(),
+			"Error Deleting posture check", "Could not DELETE posture check, unexpected error: "+err.Error(),
 		)
 		return
 	}
 }
 
-func (r *serviceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *postureCheckDomainResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
