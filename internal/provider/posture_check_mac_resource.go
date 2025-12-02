@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"time"
 
@@ -207,7 +208,7 @@ func (r *postureCheckMacResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, state.ID.ValueString())
+	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 	cresp, err := ReadZitiResource(authUrl, r.resourceConfig.apiToken)
 	msg := fmt.Sprintf("Ziti GET Response: %s", cresp)
 	log.Info().Msg(msg)
@@ -337,7 +338,7 @@ func (r *postureCheckMacResource) Update(ctx context.Context, req resource.Updat
 	jsonData, _ := json.Marshal(payload)
 	fmt.Printf("**********************update resource payload***********************:\n %+v\n", jsonData)
 
-	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, state.ID.ValueString())
+	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 	cresp, err := PatchZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
 	msg := fmt.Sprintf("Ziti PATCH Response: %s", cresp)
 	log.Info().Msg(msg)
@@ -368,7 +369,7 @@ func (r *postureCheckMacResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
-	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, state.ID.ValueString())
+	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 
 	cresp, err := DeleteZitiResource(authUrl, r.resourceConfig.apiToken)
 	msg := fmt.Sprintf("Ziti Delete Response: %s", cresp)

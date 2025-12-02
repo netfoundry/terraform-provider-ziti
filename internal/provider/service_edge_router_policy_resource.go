@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -203,7 +204,7 @@ func (r *serviceEdgeRouterPolicyResource) Read(ctx context.Context, req resource
 		return
 	}
 
-	authUrl := fmt.Sprintf("%s/service-edge-router-policies/%s", r.resourceConfig.host, state.ID.ValueString())
+	authUrl := fmt.Sprintf("%s/service-edge-router-policies/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 	cresp, err := ReadZitiResource(authUrl, r.resourceConfig.apiToken)
 	msg := fmt.Sprintf("Ziti GET Response: %s", cresp)
 	log.Info().Msg(msg)
@@ -329,7 +330,7 @@ func (r *serviceEdgeRouterPolicyResource) Update(ctx context.Context, req resour
 	jsonData, _ := json.Marshal(payload)
 	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
 
-	authUrl := fmt.Sprintf("%s/service-edge-router-policies/%s", r.resourceConfig.host, state.ID.ValueString())
+	authUrl := fmt.Sprintf("%s/service-edge-router-policies/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 	cresp, err := UpdateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
 	msg := fmt.Sprintf("Ziti PUT Response: %s", cresp)
 	log.Info().Msg(msg)
@@ -360,7 +361,7 @@ func (r *serviceEdgeRouterPolicyResource) Delete(ctx context.Context, req resour
 		return
 	}
 
-	authUrl := fmt.Sprintf("%s/service-edge-router-policies/%s", r.resourceConfig.host, state.ID.ValueString())
+	authUrl := fmt.Sprintf("%s/service-edge-router-policies/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 
 	cresp, err := DeleteZitiResource(authUrl, r.resourceConfig.apiToken)
 	msg := fmt.Sprintf("Ziti Delete Response: %s", cresp)

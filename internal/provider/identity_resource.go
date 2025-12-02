@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -322,7 +323,7 @@ func (r *identityResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	authUrl := fmt.Sprintf("%s/identities/%s", r.resourceConfig.host, state.ID.ValueString())
+	authUrl := fmt.Sprintf("%s/identities/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 	cresp, err := ReadZitiResource(authUrl, r.resourceConfig.apiToken)
 	msg := fmt.Sprintf("Ziti GET Response: %s", cresp)
 	log.Info().Msg(msg)
@@ -503,7 +504,7 @@ func (r *identityResource) Update(ctx context.Context, req resource.UpdateReques
 	jsonData, _ := json.Marshal(payload)
 	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
 
-	authUrl := fmt.Sprintf("%s/identities/%s", r.resourceConfig.host, eplan.ID.ValueString())
+	authUrl := fmt.Sprintf("%s/identities/%s", r.resourceConfig.host, url.QueryEscape(eplan.ID.ValueString()))
 	cresp, err := UpdateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
 	msg := fmt.Sprintf("Ziti PUT Response: %s", cresp)
 	log.Info().Msg(msg)
@@ -539,7 +540,7 @@ func (r *identityResource) Delete(ctx context.Context, req resource.DeleteReques
 		return
 	}
 
-	authUrl := fmt.Sprintf("%s/identities/%s", r.resourceConfig.host, state.ID.ValueString())
+	authUrl := fmt.Sprintf("%s/identities/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 
 	cresp, err := DeleteZitiResource(authUrl, r.resourceConfig.apiToken)
 	msg := fmt.Sprintf("Ziti DELETE Response: %s", cresp)
