@@ -63,6 +63,7 @@ type hostV1ConfigDataSourceModel struct {
 	AllowedSourceAddresses types.List   `tfsdk:"allowed_source_addresses"`
 	AllowedPortRanges      types.List   `tfsdk:"allowed_port_ranges"`
 	ListenOptions          types.Object `tfsdk:"listen_options"`
+	Proxy                  types.Object `tfsdk:"proxy"`
 	PortChecks             types.List   `tfsdk:"port_checks"`
 	HTTPChecks             types.List   `tfsdk:"http_checks"`
 	Tags                   types.Map    `tfsdk:"tags"`
@@ -116,6 +117,18 @@ func (r *hostV1ConfigDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 				ElementType:         types.StringType,
 				Computed:            true,
 				MarkdownDescription: "Source addresses that can be forwarded.",
+			},
+			"proxy": schema.SingleNestedAttribute{
+				Computed: true,
+				Attributes: map[string]schema.Attribute{
+					"address": schema.StringAttribute{
+						Computed: true,
+					},
+					"type": schema.StringAttribute{
+						Computed: true,
+					},
+				},
+				MarkdownDescription: "Proxy details.",
 			},
 			"listen_options": schema.SingleNestedAttribute{
 				Computed: true,
@@ -268,6 +281,7 @@ func ResourceModelToDataSourceModel(resourceModel hostV1ConfigResourceModel) hos
 		AllowedSourceAddresses: resourceModel.AllowedSourceAddresses,
 		AllowedPortRanges:      resourceModel.AllowedPortRanges,
 		ListenOptions:          resourceModel.ListenOptions,
+		Proxy:                  resourceModel.Proxy,
 		PortChecks:             resourceModel.PortChecks,
 		HTTPChecks:             resourceModel.HTTPChecks,
 	}

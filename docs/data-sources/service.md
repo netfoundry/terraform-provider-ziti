@@ -2,12 +2,12 @@
 page_title: "ziti_service Data Source - terraform-provider-ziti"
 subcategory: ""
 description: |-
-  Ziti Service Resource
+  Ziti Service Data Source
 ---
 
 # ziti_service (Data Source)
 
-Ziti Service Resource
+Ziti Service Data Source
 
 ## Example Usage
 

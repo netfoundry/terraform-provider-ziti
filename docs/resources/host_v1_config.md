@@ -96,6 +96,7 @@ resource "ziti_host_v1_config" "test_host" {
 - `port` (Number) Port of a target address
 - `port_checks` (Attributes List) Port Checks. (see [below for nested schema](#nestedatt--port_checks))
 - `protocol` (String) Protocol which config would be allowed to receive
+- `proxy` (Attributes) Proxy details. (see [below for nested schema](#nestedatt--proxy))
 - `tags` (Map of String) Config Tags
 
 ### Read-Only
@@ -178,6 +179,16 @@ Required:
 Optional:
 
 - `consecutive_events` (Number)
+
+
+
+<a id="nestedatt--proxy"></a>
+### Nested Schema for `proxy`
+
+Optional:
+
+- `address` (String)
+- `type` (String)
 
 ## Import
 
