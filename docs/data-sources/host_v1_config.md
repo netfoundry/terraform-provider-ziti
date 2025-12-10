@@ -16,7 +16,7 @@ data "ziti_host_v1_config" "test_host_v1_data" {
   name = "test.host.v1"
 }
 
-output "ziti_intercept_config" {
+output "ziti_host_config" {
   value = data.ziti_host_v1_config.test_host_v1_data
 }
 ```
@@ -45,6 +45,7 @@ output "ziti_intercept_config" {
 - `port` (Number) Port of a target address
 - `port_checks` (Attributes List) Port Checks. (see [below for nested schema](#nestedatt--port_checks))
 - `protocol` (String) Protocol which config would be allowed to receive
+- `proxy` (Attributes) Proxy details. (see [below for nested schema](#nestedatt--proxy))
 - `tags` (Map of String) Config Tags
 
 <a id="nestedatt--allowed_port_ranges"></a>
@@ -113,3 +114,13 @@ Read-Only:
 - `consecutive_events` (Number)
 - `duration` (String)
 - `trigger` (String)
+
+
+
+<a id="nestedatt--proxy"></a>
+### Nested Schema for `proxy`
+
+Read-Only:
+
+- `address` (String)
+- `type` (String)

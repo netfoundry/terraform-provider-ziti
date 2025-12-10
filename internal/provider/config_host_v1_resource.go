@@ -59,6 +59,13 @@ var ListenOptionsModel = types.ObjectType{
 	},
 }
 
+var ProxyModel = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"address": types.StringType,
+		"type":    types.StringType,
+	},
+}
+
 var CheckActionModel = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
 		"trigger":            types.StringType,
@@ -126,6 +133,7 @@ type hostV1ConfigResourceModel struct {
 	AllowedSourceAddresses types.List   `tfsdk:"allowed_source_addresses"`
 	AllowedPortRanges      types.List   `tfsdk:"allowed_port_ranges"`
 	ListenOptions          types.Object `tfsdk:"listen_options"`
+	Proxy                  types.Object `tfsdk:"proxy"`
 	PortChecks             types.List   `tfsdk:"port_checks"`
 	HTTPChecks             types.List   `tfsdk:"http_checks"`
 	Tags                   types.Map    `tfsdk:"tags"`
@@ -195,6 +203,24 @@ func (r *hostV1ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:            true,
 				Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
 				MarkdownDescription: "Source addresses that can be forwarded.",
+			},
+			"proxy": schema.SingleNestedAttribute{
+				Optional: true,
+				Attributes: map[string]schema.Attribute{
+					"address": schema.StringAttribute{
+						Optional: true,
+						Computed: true,
+					},
+					"type": schema.StringAttribute{
+						Optional: true,
+						Computed: true,
+						Default:  stringdefault.StaticString("http"),
+						Validators: []validator.String{
+							stringvalidator.OneOf("http"),
+						},
+					},
+				},
+				MarkdownDescription: "Proxy details.",
 			},
 			"listen_options": schema.SingleNestedAttribute{
 				Optional: true,
@@ -416,6 +442,11 @@ type ListenOptionsDTO struct {
 	Precedence            *string `json:"precedence,omitempty"`
 }
 
+type ProxyDTO struct {
+	Address *string `json:"address,omitempty"`
+	Type    *string `json:"type,omitempty"`
+}
+
 type CheckActionDTO struct {
 	Trigger           *string `json:"trigger"`
 	Duration          *string `json:"duration"`
@@ -453,6 +484,7 @@ type HostConfigDTO struct {
 	AllowedSourceAddresses *[]string         `json:"allowedSourceAddresses,omitempty"`
 	AllowedPortRanges      *[]ConfigPortsDTO `json:"allowedPortRanges,omitempty"`
 	ListenOptions          *ListenOptionsDTO `json:"listenOptions,omitempty"`
+	Proxy                  *ProxyDTO         `json:"proxy,omitempty"`
 	HTTPChecks             *[]HTTPCheckDTO   `json:"httpChecks,omitempty"`
 	PortChecks             *[]PortCheckDTO   `json:"portChecks,omitempty"`
 }
@@ -463,6 +495,15 @@ func AttributesToListenOptionsStruct(ctx context.Context, attr map[string]attr.V
 	attrsNative = convertKeysToCamel(attrsNative)
 	GenericFromObject(attrsNative, &listenOptions)
 	return listenOptions
+
+}
+
+func AttributesToProxyStruct(ctx context.Context, attr map[string]attr.Value) ProxyDTO {
+	var proxy ProxyDTO
+	attrsNative := AttributesToNativeTypes(ctx, attr)
+	attrsNative = convertKeysToCamel(attrsNative)
+	GenericFromObject(attrsNative, &proxy)
+	return proxy
 
 }
 
@@ -611,6 +652,22 @@ func (dto *HostConfigDTO) ConvertToZitiResourceModel(ctx context.Context) hostV1
 		res.ListenOptions = types.ObjectNull(ListenOptionsModel.AttrTypes)
 	}
 
+	if dto.Proxy != nil {
+		proxyObject, _ := JsonStructToObject(ctx, *dto.Proxy, true, false)
+		proxyObject = convertKeysToSnake(proxyObject)
+
+		proxyMap := NativeBasicTypedAttributesToTerraform(ctx, proxyObject, ProxyModel.AttrTypes)
+
+		proxyOptionsTf, err := basetypes.NewObjectValue(ProxyModel.AttrTypes, proxyMap)
+		if err != nil {
+			oneerr := err[0]
+			tflog.Debug(ctx, "Error converting proxyMap to an object: "+oneerr.Summary()+" | "+oneerr.Detail())
+		}
+		res.Proxy = proxyOptionsTf
+	} else {
+		res.Proxy = types.ObjectNull(ProxyModel.AttrTypes)
+	}
+
 	if dto.HTTPChecks != nil {
 		res.HTTPChecks = convertChecksToTerraformList(ctx, *dto.HTTPChecks, HTTPCheckModel.AttrTypes, HTTPCheckModel)
 	} else {
@@ -629,6 +686,7 @@ func (dto *HostConfigDTO) ConvertToZitiResourceModel(ctx context.Context) hostV1
 
 func (r *hostV1ConfigResourceModel) ToHostConfigDTO(ctx context.Context) HostConfigDTO {
 	listenOptions := AttributesToListenOptionsStruct(ctx, r.ListenOptions.Attributes())
+	proxy := AttributesToProxyStruct(ctx, r.Proxy.Attributes())
 	var portChecks []PortCheckDTO
 	for _, v := range r.PortChecks.Elements() {
 		if v, ok := v.(types.Object); ok {
@@ -648,6 +706,7 @@ func (r *hostV1ConfigResourceModel) ToHostConfigDTO(ctx context.Context) HostCon
 		Address:                r.Address.ValueStringPointer(),
 		Protocol:               r.Protocol.ValueStringPointer(),
 		ListenOptions:          &listenOptions,
+		Proxy:                  &proxy,
 		PortChecks:             &portChecks,
 		HTTPChecks:             &httpChecks,
 		ForwardAddress:         r.ForwardAddress.ValueBoolPointer(),

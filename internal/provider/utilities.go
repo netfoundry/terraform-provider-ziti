@@ -136,6 +136,115 @@ func JsonStructToObject(ctx context.Context, s interface{}, makeZeroNil bool, ig
 	return result, nil
 
 }
+
+func JsonStructToObject2(ctx context.Context, v interface{}, omitEmpty bool, derefPtrs bool) (map[string]interface{}, error) {
+	val := reflect.ValueOf(v)
+
+	// Dereference pointer to struct
+	if derefPtrs {
+		for val.Kind() == reflect.Ptr {
+			if val.IsNil() {
+				return map[string]interface{}{}, nil
+			}
+			val = val.Elem()
+		}
+	}
+
+	if val.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("JsonStructToObject requires a struct, got %s", val.Kind())
+	}
+
+	return structToMap(val, omitEmpty, derefPtrs), nil
+}
+
+func structToMap(val reflect.Value, omitEmpty bool, derefPtrs bool) map[string]interface{} {
+	out := make(map[string]interface{})
+
+	t := val.Type()
+
+	for i := 0; i < val.NumField(); i++ {
+		field := t.Field(i)
+		fieldVal := val.Field(i)
+
+		// ignore unexported fields
+		if !fieldVal.CanInterface() {
+			continue
+		}
+
+		// json tag
+		tag := field.Tag.Get("json")
+		if tag == "-" {
+			continue
+		}
+
+		fieldName := strings.Split(tag, ",")[0]
+		if fieldName == "" {
+			fieldName = field.Name
+		}
+
+		converted := convertValue(fieldVal, omitEmpty, derefPtrs)
+
+		if omitEmpty {
+			if converted == nil {
+				continue
+			}
+			if isZero(converted) {
+				continue
+			}
+		}
+
+		out[fieldName] = converted
+	}
+
+	return out
+}
+
+func convertValue(val reflect.Value, omitEmpty bool, derefPtrs bool) interface{} {
+
+	// Dereference pointers
+	if derefPtrs {
+		for val.Kind() == reflect.Ptr {
+			if val.IsNil() {
+				return nil
+			}
+			val = val.Elem()
+		}
+	}
+
+	switch val.Kind() {
+
+	case reflect.Struct:
+		return structToMap(val, omitEmpty, derefPtrs)
+
+	case reflect.Slice, reflect.Array:
+		arr := []interface{}{}
+		for i := 0; i < val.Len(); i++ {
+			arr = append(arr, convertValue(val.Index(i), omitEmpty, derefPtrs))
+		}
+		return arr
+
+	case reflect.Map:
+		m := make(map[string]interface{})
+		iter := val.MapRange()
+		for iter.Next() {
+			key := iter.Key().Interface()
+			value := iter.Value()
+			m[key.(string)] = convertValue(value, omitEmpty, derefPtrs)
+		}
+		return m
+
+	case reflect.Invalid:
+		return nil
+
+	default:
+		return val.Interface()
+	}
+}
+
+func isZero(v interface{}) bool {
+	return v == nil || reflect.DeepEqual(v, reflect.Zero(reflect.TypeOf(v)).Interface())
+}
+
 func ElementsToStringArray(elements []attr.Value) *[]string {
 	if len(elements) != 0 {
 		elementsArray := []string{}
