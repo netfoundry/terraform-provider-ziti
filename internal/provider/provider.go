@@ -265,6 +265,7 @@ func (p *zitiProvider) DataSources(_ context.Context) []func() datasource.DataSo
 		NewPostureCheckDomainDataSource,
 		NewPostureCheckMFADataSource,
 		NewPostureCheckOSDataSource,
+		NewPostureCheckProcessDataSource,
 	}
 }
 
@@ -284,5 +285,6 @@ func (p *zitiProvider) Resources(_ context.Context) []func() resource.Resource {
 		NewPostureCheckDomainResource,
 		NewPostureCheckMFAResource,
 		NewPostureCheckOSResource,
+		NewPostureCheckProcessResource,
 	}
 }
