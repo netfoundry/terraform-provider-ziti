@@ -157,7 +157,7 @@ func (r *postureCheckMultiProcessResource) Schema(_ context.Context, _ resource.
 						"signer_fingerprints": schema.ListAttribute{
 							ElementType:         types.StringType,
 							Optional:            true,
-							MarkdownDescription: "Sign fingerprint",
+							MarkdownDescription: "Signer fingerprints list",
 						},
 					},
 				},

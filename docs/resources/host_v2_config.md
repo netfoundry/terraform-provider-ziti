@@ -273,6 +273,6 @@ Optional:
 Import is supported using the following syntax:
 
 ```shell
-# host config can be imported by specifying the identifier.
+# host v2 config can be imported by specifying the identifier.
 terraform import ziti_host_v2_config.simple_host_v2 <ID>
 ```

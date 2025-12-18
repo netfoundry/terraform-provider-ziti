@@ -1,5 +1,5 @@
 # Author: Vinay Lakshmaiah
-# Date::   19-Mar-2025
+# Date:   19-Mar-2025
 
 terraform {
   required_providers {
