@@ -103,7 +103,7 @@ func (r *posterCheckMultiProcessDataSource) Schema(_ context.Context, _ datasour
 						"signer_fingerprints": schema.ListAttribute{
 							ElementType:         types.StringType,
 							Computed:            true,
-							MarkdownDescription: "Sign fingerprint",
+							MarkdownDescription: "Signer fingerprints list",
 						},
 					},
 				},

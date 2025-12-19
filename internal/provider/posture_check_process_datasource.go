@@ -95,7 +95,7 @@ func (r *posterCheckProcessDataSource) Schema(_ context.Context, _ datasource.Sc
 					},
 					"signer_fingerprint": schema.StringAttribute{
 						Computed:            true,
-						MarkdownDescription: "Sign fingerprint",
+						MarkdownDescription: "Signer fingerprint",
 					},
 				},
 			},

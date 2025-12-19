@@ -143,7 +143,7 @@ func (r *postureCheckProcessResource) Schema(_ context.Context, _ resource.Schem
 					},
 					"signer_fingerprint": schema.StringAttribute{
 						Optional:            true,
-						MarkdownDescription: "Sign fingerprint",
+						MarkdownDescription: "Signer fingerprint",
 					},
 				},
 			},
