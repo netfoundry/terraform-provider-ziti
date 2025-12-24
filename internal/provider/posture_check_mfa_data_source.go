@@ -13,22 +13,22 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ datasource.DataSource              = &posterCheckMacDataSource{}
-	_ datasource.DataSourceWithConfigure = &posterCheckMacDataSource{}
+	_ datasource.DataSource              = &postureCheckMFADataSource{}
+	_ datasource.DataSourceWithConfigure = &postureCheckMFADataSource{}
 )
 
-// NewPostureCheckMacDataSource is a helper function to simplify the provider implementation.
-func NewPostureCheckMacDataSource() datasource.DataSource {
-	return &posterCheckMacDataSource{}
+// NewPostureCheckMFADataSource is a helper function to simplify the provider implementation.
+func NewPostureCheckMFADataSource() datasource.DataSource {
+	return &postureCheckMFADataSource{}
 }
 
-// posterCheckMacDataSource is the datasource implementation.
-type posterCheckMacDataSource struct {
+// postureCheckMFADataSource is the datasource implementation.
+type postureCheckMFADataSource struct {
 	datasourceConfig *zitiData
 }
 
 // Configure adds the provider configured client to the datasource.
-func (r *posterCheckMacDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (r *postureCheckMFADataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	// Add a nil check when handling ProviderData because Terraform
 	// sets that data after it calls the ConfigureProvider RPC.
 	if req.ProviderData == nil {
@@ -43,23 +43,25 @@ func (r *posterCheckMacDataSource) Configure(_ context.Context, req datasource.C
 }
 
 // Metadata returns the datasource type name.
-func (r *posterCheckMacDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_posture_check_mac_addresses"
+func (r *postureCheckMFADataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_posture_check_mfa"
 }
 
-// posterCheckMacDataSourceModel maps the datasource schema data.
-type posterCheckMacDataSourceModel struct {
+// postureCheckMFADataSourceModel maps the datasource schema data.
+type postureCheckMFADataSourceModel struct {
 	ID             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
 	RoleAttributes types.List   `tfsdk:"role_attributes"`
-	MacAddresses   types.List   `tfsdk:"mac_addresses"`
+	PromptOnUnlock types.Bool   `tfsdk:"prompt_on_unlock"`
+	PromptOnWake   types.Bool   `tfsdk:"prompt_on_wake"`
+	TimeoutSeconds types.Int64  `tfsdk:"timeout_seconds"`
 	Tags           types.Map    `tfsdk:"tags"`
 }
 
 // Schema defines the schema for the datasource.
-func (r *posterCheckMacDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (r *postureCheckMFADataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Ziti Posture Check Data Source, type: MAC Address check",
+		MarkdownDescription: "Ziti Posture Check Data Source, type: MFA check",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -76,10 +78,20 @@ func (r *posterCheckMacDataSource) Schema(_ context.Context, _ datasource.Schema
 				ElementType:         types.StringType,
 				MarkdownDescription: "Role Attributes",
 			},
-			"mac_addresses": schema.ListAttribute{
-				ElementType:         types.StringType,
+			"prompt_on_unlock": schema.BoolAttribute{
+				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: "MAC address list",
+				MarkdownDescription: "Prompt mfa when device unlocks.",
+			},
+			"prompt_on_wake": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "Prompt mfa when device wakes.",
+			},
+			"timeout_seconds": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "MFA check time out in seconds.",
 			},
 			"tags": schema.MapAttribute{
 				Computed:            true,
@@ -91,9 +103,9 @@ func (r *posterCheckMacDataSource) Schema(_ context.Context, _ datasource.Schema
 }
 
 // Read datasource information.
-func (r *posterCheckMacDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (r *postureCheckMFADataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	// Get current state
-	var state posterCheckMacDataSourceModel
+	var state postureCheckMFADataSourceModel
 	diags := req.Config.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -151,10 +163,20 @@ func (r *posterCheckMacDataSource) Read(ctx context.Context, req datasource.Read
 	state.Name = types.StringValue(data["name"].(string))
 	state.ID = types.StringValue(data["id"].(string))
 
-	if macAddresses, ok := data["macAddresses"].([]interface{}); ok {
-		macAddresses, diag := types.ListValueFrom(ctx, types.StringType, macAddresses)
-		resp.Diagnostics = append(resp.Diagnostics, diag...)
-		state.MacAddresses = macAddresses
+	if timeoutSeconds, ok := data["timeoutSeconds"].(float64); ok {
+		state.TimeoutSeconds = types.Int64Value(int64(timeoutSeconds))
+	}
+
+	if promptOnWake, ok := data["promptOnWake"].(bool); ok {
+		state.PromptOnWake = types.BoolValue(promptOnWake)
+	} else {
+		state.PromptOnWake = types.BoolValue(false)
+	}
+
+	if promptOnUnlock, ok := data["promptOnUnlock"].(bool); ok {
+		state.PromptOnUnlock = types.BoolValue(promptOnUnlock)
+	} else {
+		state.PromptOnUnlock = types.BoolValue(false)
 	}
 
 	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {

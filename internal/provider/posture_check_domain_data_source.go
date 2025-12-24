@@ -13,22 +13,22 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ datasource.DataSource              = &posterCheckDomainDataSource{}
-	_ datasource.DataSourceWithConfigure = &posterCheckDomainDataSource{}
+	_ datasource.DataSource              = &postureCheckDomainDataSource{}
+	_ datasource.DataSourceWithConfigure = &postureCheckDomainDataSource{}
 )
 
 // NewPostureCheckDomainDataSource is a helper function to simplify the provider implementation.
 func NewPostureCheckDomainDataSource() datasource.DataSource {
-	return &posterCheckDomainDataSource{}
+	return &postureCheckDomainDataSource{}
 }
 
-// posterCheckDomainDataSource is the datasource implementation.
-type posterCheckDomainDataSource struct {
+// postureCheckDomainDataSource is the datasource implementation.
+type postureCheckDomainDataSource struct {
 	datasourceConfig *zitiData
 }
 
 // Configure adds the provider configured client to the datasource.
-func (r *posterCheckDomainDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (r *postureCheckDomainDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	// Add a nil check when handling ProviderData because Terraform
 	// sets that data after it calls the ConfigureProvider RPC.
 	if req.ProviderData == nil {
@@ -43,12 +43,12 @@ func (r *posterCheckDomainDataSource) Configure(_ context.Context, req datasourc
 }
 
 // Metadata returns the datasource type name.
-func (r *posterCheckDomainDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+func (r *postureCheckDomainDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_posture_check_domains"
 }
 
-// posterCheckDomainDataSourceModel maps the datasource schema data.
-type posterCheckDomainDataSourceModel struct {
+// postureCheckDomainDataSourceModel maps the datasource schema data.
+type postureCheckDomainDataSourceModel struct {
 	ID             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
 	RoleAttributes types.List   `tfsdk:"role_attributes"`
@@ -57,7 +57,7 @@ type posterCheckDomainDataSourceModel struct {
 }
 
 // Schema defines the schema for the datasource.
-func (r *posterCheckDomainDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (r *postureCheckDomainDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Ziti Posture Check Data Source, type: Windows Domains check",
 		Attributes: map[string]schema.Attribute{
@@ -91,9 +91,9 @@ func (r *posterCheckDomainDataSource) Schema(_ context.Context, _ datasource.Sch
 }
 
 // Read datasource information.
-func (r *posterCheckDomainDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (r *postureCheckDomainDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	// Get current state
-	var state posterCheckDomainDataSourceModel
+	var state postureCheckDomainDataSourceModel
 	diags := req.Config.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
