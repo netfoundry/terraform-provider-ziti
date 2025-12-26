@@ -4,35 +4,32 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/rs/zerolog/log"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ datasource.DataSource              = &posterCheckOSDataSource{}
-	_ datasource.DataSourceWithConfigure = &posterCheckOSDataSource{}
+	_ datasource.DataSource              = &postureCheckMultiProcessDataSource{}
+	_ datasource.DataSourceWithConfigure = &postureCheckMultiProcessDataSource{}
 )
 
-// NewPostureCheckOSDataSource is a helper function to simplify the provider implementation.
-func NewPostureCheckOSDataSource() datasource.DataSource {
-	return &posterCheckOSDataSource{}
+// NewPostureCheckMultiProcessDataSource is a helper function to simplify the provider implementation.
+func NewPostureCheckMultiProcessDataSource() datasource.DataSource {
+	return &postureCheckMultiProcessDataSource{}
 }
 
-// posterCheckOSDataSource is the datasource implementation.
-type posterCheckOSDataSource struct {
+// postureCheckMultiProcessDataSource is the datasource implementation.
+type postureCheckMultiProcessDataSource struct {
 	datasourceConfig *zitiData
 }
 
 // Configure adds the provider configured client to the datasource.
-func (r *posterCheckOSDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (r *postureCheckMultiProcessDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	// Add a nil check when handling ProviderData because Terraform
 	// sets that data after it calls the ConfigureProvider RPC.
 	if req.ProviderData == nil {
@@ -47,23 +44,24 @@ func (r *posterCheckOSDataSource) Configure(_ context.Context, req datasource.Co
 }
 
 // Metadata returns the datasource type name.
-func (r *posterCheckOSDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_posture_check_os"
+func (r *postureCheckMultiProcessDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_posture_check_multi_process"
 }
 
-// posterCheckOSDataSourceModel maps the datasource schema data.
-type posterCheckOSDataSourceModel struct {
-	ID               types.String `tfsdk:"id"`
-	Name             types.String `tfsdk:"name"`
-	RoleAttributes   types.List   `tfsdk:"role_attributes"`
-	OperatingSystems types.Set    `tfsdk:"operating_systems"`
-	Tags             types.Map    `tfsdk:"tags"`
+// postureCheckMultiProcessDataSourceModel maps the datasource schema data.
+type postureCheckMultiProcessDataSourceModel struct {
+	ID             types.String `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	RoleAttributes types.List   `tfsdk:"role_attributes"`
+	Semantic       types.String `tfsdk:"semantic"`
+	Processes      types.Set    `tfsdk:"processes"`
+	Tags           types.Map    `tfsdk:"tags"`
 }
 
 // Schema defines the schema for the datasource.
-func (r *posterCheckOSDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (r *postureCheckMultiProcessDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Ziti Posture Check Data Source, type: OS check",
+		MarkdownDescription: "Ziti Posture Check Data Source, type: Multi Process check",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -80,22 +78,35 @@ func (r *posterCheckOSDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				ElementType:         types.StringType,
 				MarkdownDescription: "Role Attributes",
 			},
-			"operating_systems": schema.SetNestedAttribute{
+			"semantic": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "Semantic Value",
+			},
+			"processes": schema.SetNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"type": schema.StringAttribute{
+						"path": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: "Type of operating system",
+							MarkdownDescription: "Path",
 						},
-						"versions": schema.ListAttribute{
+						"os_type": schema.StringAttribute{
+							Computed:            true,
+							MarkdownDescription: "Operating System type",
+						},
+						"hashes": schema.ListAttribute{
 							ElementType:         types.StringType,
 							Computed:            true,
-							MarkdownDescription: "Min version and Max version of the os",
+							MarkdownDescription: "File hashes list",
+						},
+						"signer_fingerprints": schema.ListAttribute{
+							ElementType:         types.StringType,
+							Computed:            true,
+							MarkdownDescription: "Signer fingerprints list",
 						},
 					},
 				},
-				MarkdownDescription: "OS List",
 			},
 			"tags": schema.MapAttribute{
 				Computed:            true,
@@ -107,9 +118,9 @@ func (r *posterCheckOSDataSource) Schema(_ context.Context, _ datasource.SchemaR
 }
 
 // Read datasource information.
-func (r *posterCheckOSDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (r *postureCheckMultiProcessDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	// Get current state
-	var state posterCheckOSDataSourceModel
+	var state postureCheckMultiProcessDataSourceModel
 	diags := req.Config.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -167,42 +178,56 @@ func (r *posterCheckOSDataSource) Read(ctx context.Context, req datasource.ReadR
 	state.Name = types.StringValue(data["name"].(string))
 	state.ID = types.StringValue(data["id"].(string))
 
-	if osList, ok := data["operatingSystems"].([]interface{}); ok && len(osList) > 0 {
-		objects := make([]attr.Value, 0, len(osList))
+	if semanticValue, ok := data["semantic"].(string); ok {
+		state.Semantic = types.StringValue(semanticValue)
+	}
 
-		for _, osItem := range osList {
-			osMap := osItem.(map[string]interface{})
+	if procs, ok := data["processes"].([]interface{}); ok && len(procs) > 0 {
+		var processValues []attr.Value
 
-			versionStrs := []string{}
-			if vList, ok := osMap["versions"].([]interface{}); ok && len(vList) > 0 {
-				for _, v := range vList {
-					versionStrs = append(versionStrs, strings.TrimSpace(fmt.Sprintf("%v", v)))
-				}
-				sort.Strings(versionStrs)
+		for _, p := range procs {
+			proc, ok := p.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			attrTypes := MultiProcessModel.AttrTypes
+			values := make(map[string]attr.Value)
+
+			if v, ok := proc["path"].(string); ok {
+				values["path"] = types.StringValue(v)
 			}
 
-			var versionsList types.List
-			if len(versionStrs) == 0 {
-				versionsList = types.ListNull(types.StringType)
+			if v, ok := proc["osType"].(string); ok {
+				values["os_type"] = types.StringValue(v)
+			}
+
+			if fps, ok := proc["signerFingerprints"].([]interface{}); ok && len(fps) > 0 {
+				list, diag := types.ListValueFrom(ctx, types.StringType, fps)
+				resp.Diagnostics.Append(diag...)
+				values["signer_fingerprints"] = list
 			} else {
-				versionsList, _ = types.ListValueFrom(ctx, types.StringType, versionStrs)
+				values["signer_fingerprints"] = types.ListNull(types.StringType)
 			}
 
-			osType := strings.TrimSpace(osMap["type"].(string))
-
-			objectMap := map[string]attr.Value{
-				"type":     types.StringValue(osType),
-				"versions": versionsList,
+			if hashes, ok := proc["hashes"].([]interface{}); ok && len(hashes) > 0 {
+				list, diag := types.ListValueFrom(ctx, types.StringType, hashes)
+				resp.Diagnostics.Append(diag...)
+				values["hashes"] = list
+			} else {
+				values["hashes"] = types.ListNull(types.StringType)
 			}
 
-			obj, _ := basetypes.NewObjectValue(OperatingSystemModel.AttrTypes, objectMap)
-			objects = append(objects, obj)
+			obj, diag := types.ObjectValue(attrTypes, values)
+			resp.Diagnostics.Append(diag...)
+			processValues = append(processValues, obj)
 		}
 
-		osSetValue, _ := types.SetValueFrom(ctx, OperatingSystemModel, objects)
-		state.OperatingSystems = osSetValue
+		list, diag := types.SetValue(types.ObjectType{AttrTypes: MultiProcessModel.AttrTypes}, processValues)
+		resp.Diagnostics.Append(diag...)
+
+		state.Processes = list
 	} else {
-		state.OperatingSystems = types.SetNull(OperatingSystemModel)
+		state.Processes = types.SetNull(types.ObjectType{AttrTypes: MultiProcessModel.AttrTypes})
 	}
 
 	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {

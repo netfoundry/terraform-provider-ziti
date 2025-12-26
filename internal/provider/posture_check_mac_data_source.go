@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -14,22 +13,22 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ datasource.DataSource              = &posterCheckProcessDataSource{}
-	_ datasource.DataSourceWithConfigure = &posterCheckProcessDataSource{}
+	_ datasource.DataSource              = &postureCheckMacDataSource{}
+	_ datasource.DataSourceWithConfigure = &postureCheckMacDataSource{}
 )
 
-// NewPostureCheckProcessDataSource is a helper function to simplify the provider implementation.
-func NewPostureCheckProcessDataSource() datasource.DataSource {
-	return &posterCheckProcessDataSource{}
+// NewPostureCheckMacDataSource is a helper function to simplify the provider implementation.
+func NewPostureCheckMacDataSource() datasource.DataSource {
+	return &postureCheckMacDataSource{}
 }
 
-// posterCheckProcessDataSource is the datasource implementation.
-type posterCheckProcessDataSource struct {
+// postureCheckMacDataSource is the datasource implementation.
+type postureCheckMacDataSource struct {
 	datasourceConfig *zitiData
 }
 
 // Configure adds the provider configured client to the datasource.
-func (r *posterCheckProcessDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (r *postureCheckMacDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	// Add a nil check when handling ProviderData because Terraform
 	// sets that data after it calls the ConfigureProvider RPC.
 	if req.ProviderData == nil {
@@ -44,23 +43,23 @@ func (r *posterCheckProcessDataSource) Configure(_ context.Context, req datasour
 }
 
 // Metadata returns the datasource type name.
-func (r *posterCheckProcessDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_posture_check_process"
+func (r *postureCheckMacDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_posture_check_mac_addresses"
 }
 
-// posterCheckProcessDataSourceModel maps the datasource schema data.
-type posterCheckProcessDataSourceModel struct {
+// postureCheckMacDataSourceModel maps the datasource schema data.
+type postureCheckMacDataSourceModel struct {
 	ID             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
 	RoleAttributes types.List   `tfsdk:"role_attributes"`
-	Process        types.Object `tfsdk:"process"`
+	MacAddresses   types.List   `tfsdk:"mac_addresses"`
 	Tags           types.Map    `tfsdk:"tags"`
 }
 
 // Schema defines the schema for the datasource.
-func (r *posterCheckProcessDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (r *postureCheckMacDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Ziti Posture Check Data Source, type: Process check",
+		MarkdownDescription: "Ziti Posture Check Data Source, type: MAC Address check",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -77,27 +76,10 @@ func (r *posterCheckProcessDataSource) Schema(_ context.Context, _ datasource.Sc
 				ElementType:         types.StringType,
 				MarkdownDescription: "Role Attributes",
 			},
-			"process": schema.SingleNestedAttribute{
-				Computed: true,
-				Attributes: map[string]schema.Attribute{
-					"path": schema.StringAttribute{
-						Computed:            true,
-						MarkdownDescription: "Path",
-					},
-					"os_type": schema.StringAttribute{
-						Computed:            true,
-						MarkdownDescription: "Operating System type",
-					},
-					"hashes": schema.ListAttribute{
-						ElementType:         types.StringType,
-						Computed:            true,
-						MarkdownDescription: "File hashes list",
-					},
-					"signer_fingerprint": schema.StringAttribute{
-						Computed:            true,
-						MarkdownDescription: "Signer fingerprint",
-					},
-				},
+			"mac_addresses": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Computed:            true,
+				MarkdownDescription: "MAC address list",
 			},
 			"tags": schema.MapAttribute{
 				Computed:            true,
@@ -109,9 +91,9 @@ func (r *posterCheckProcessDataSource) Schema(_ context.Context, _ datasource.Sc
 }
 
 // Read datasource information.
-func (r *posterCheckProcessDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (r *postureCheckMacDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	// Get current state
-	var state posterCheckProcessDataSourceModel
+	var state postureCheckMacDataSourceModel
 	diags := req.Config.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -169,37 +151,10 @@ func (r *posterCheckProcessDataSource) Read(ctx context.Context, req datasource.
 	state.Name = types.StringValue(data["name"].(string))
 	state.ID = types.StringValue(data["id"].(string))
 
-	if proc, ok := data["process"].(map[string]interface{}); ok {
-		attrTypes := ProcessModel.AttrTypes
-		values := make(map[string]attr.Value)
-
-		if v, ok := proc["path"].(string); ok {
-			values["path"] = types.StringValue(v)
-		}
-
-		if v, ok := proc["osType"].(string); ok {
-			values["os_type"] = types.StringValue(v)
-		}
-
-		if v, ok := proc["signerFingerprint"].(string); ok && v != "" {
-			values["signer_fingerprint"] = types.StringValue(v)
-		} else {
-			values["signer_fingerprint"] = types.StringNull()
-		}
-
-		if hashes, ok := proc["hashes"].([]interface{}); ok && len(hashes) > 0 {
-			list, diag := types.ListValueFrom(ctx, types.StringType, hashes)
-			resp.Diagnostics.Append(diag...)
-			values["hashes"] = list
-		} else {
-			values["hashes"] = types.ListNull(types.StringType)
-		}
-
-		obj, _ := types.ObjectValue(attrTypes, values)
-		state.Process = obj
-
-	} else {
-		state.Process = types.ObjectNull(ProcessModel.AttrTypes)
+	if macAddresses, ok := data["macAddresses"].([]interface{}); ok {
+		macAddresses, diag := types.ListValueFrom(ctx, types.StringType, macAddresses)
+		resp.Diagnostics = append(resp.Diagnostics, diag...)
+		state.MacAddresses = macAddresses
 	}
 
 	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {
