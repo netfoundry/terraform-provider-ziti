@@ -93,7 +93,7 @@ var ExternalIdClaimModel = types.ObjectType{
 // Schema defines the schema for the resource.
 func (r *certificateAuthorityResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Ziti Certificate Authority",
+		MarkdownDescription: "Ziti Certificate Authority Resource",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true,
@@ -249,7 +249,7 @@ func (r *certificateAuthorityResource) Create(ctx context.Context, req resource.
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************create resource payload***********************:\n %+v\n", jsonData)
+	fmt.Printf("**********************create resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/cas", r.resourceConfig.host)
 	cresp, err := CreateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
@@ -461,7 +461,7 @@ func (r *certificateAuthorityResource) Update(ctx context.Context, req resource.
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************update resource payload***********************:\n %+v\n", jsonData)
+	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/cas/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 	cresp, err := UpdateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)

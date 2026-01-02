@@ -65,7 +65,7 @@ type certificateAuthorityDataSourceModel struct {
 // Schema defines the schema for the datasource.
 func (r *certificateAuthorityDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Ziti Certificate Authority",
+		MarkdownDescription: "Ziti Certificate Authority Data Source",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,

@@ -180,7 +180,7 @@ func (r *postureCheckMFAResource) Create(ctx context.Context, req resource.Creat
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************create resource payload***********************:\n %+v\n", jsonData)
+	fmt.Printf("**********************create resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/posture-checks", r.resourceConfig.host)
 	cresp, err := CreateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
@@ -344,7 +344,7 @@ func (r *postureCheckMFAResource) Update(ctx context.Context, req resource.Updat
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************update resource payload***********************:\n %+v\n", jsonData)
+	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
 
 	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 	cresp, err := PatchZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
