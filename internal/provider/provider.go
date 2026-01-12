@@ -278,6 +278,7 @@ func (p *zitiProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewEdgeRouterPolicyResource,
 		NewIdentityResource,
+		NewIdentityUpdbResource,
 		NewServicePolicyResource,
 		NewServiceEdgeRouterPolicyResource,
 		NewEdgeRouterResource,
