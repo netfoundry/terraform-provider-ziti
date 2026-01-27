@@ -1,23 +1,22 @@
 ---
-page_title: "ziti_identity_updb Resource - terraform-provider-ziti"
+page_title: "ziti_identity_none Resource - terraform-provider-ziti"
 subcategory: ""
 description: |-
-  Ziti Identity Resource, Type: updb
+  Ziti Identity Resource, Enrollment Type: none
 ---
 
-# ziti_identity_updb (Resource)
+# ziti_identity_none (Resource)
 
-Ziti Identity Resource, Type: updb
+Ziti Identity Resource, Enrollment Type: none
 
 ## Example Usage
 
 ```terraform
-resource "ziti_identity_updb" "test_identity_updb" {
-  name                 = "test_identity_updb"
-  updb_username        = "test_user"
+resource "ziti_identity_none" "test_identity_none" {
+  name                 = "test_identity_none"
   role_attributes      = ["test"]
-  default_hosting_cost = 65
-  is_admin             = true
+  default_hosting_cost = 35
+  is_admin             = false
   tags = {
     value = "test"
   }
@@ -25,11 +24,6 @@ resource "ziti_identity_updb" "test_identity_updb" {
     "property1" = "test1"
     "property2" = "test2"
   }
-}
-
-output "ziti_identity_token" {
-  value     = ziti_identity_updb.test_identity_updb.enrollment_token
-  sensitive = true
 }
 ```
 
@@ -39,7 +33,6 @@ output "ziti_identity_token" {
 ### Required
 
 - `name` (String) Name of the Identity
-- `updb_username` (String) UPDB Username.
 
 ### Optional
 
@@ -59,13 +52,12 @@ output "ziti_identity_token" {
 
 - `id` (String) Identifier
 - `last_updated` (String) Last Updated Time
-- `enrollment_token` (String, Sensitive) The JWT token for one-time identity enrollment (OTT).
 
 ## Import
 
 Import is supported using the following syntax:
 
 ```shell
-# identity updb can be imported by specifying the identifier.
-terraform import ziti_identity_updb.test_identity_updb <ID>
+# identity_none can be imported by specifying the identifier.
+terraform import ziti_identity_none.test_identity_none <ID>
 ```

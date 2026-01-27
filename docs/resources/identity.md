@@ -45,7 +45,6 @@ output "ziti_identity_token" {
 - `auth_policy_id` (String) Auth Policy ID
 - `default_hosting_cost` (Number) Cost of the service identity
 - `default_hosting_precedence` (String) Precedence of the service identity
-- `enrollment_token` (String, Sensitive) The JWT token for one-time identity enrollment (OTT).
 - `external_id` (String) External id of the identity.
 - `is_admin` (Boolean) Flag to controls whether an identity has admin rights
 - `role_attributes` (List of String) Role Attributes
@@ -58,6 +57,7 @@ output "ziti_identity_token" {
 
 - `id` (String) Identifier
 - `last_updated` (String) Last Updated Time
+- `enrollment_token` (String, Sensitive) The JWT token for one-time identity enrollment (OTT).
 
 ## Import
 
