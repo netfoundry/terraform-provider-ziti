@@ -44,7 +44,6 @@ output "ziti_router_token" {
 
 - `app_data` (Map of String) App Data of Edge Router
 - `cost` (Number) Cost
-- `enrollment_token` (String, Sensitive) The JWT token for one-time enrollment (OTT).
 - `is_tunnelerenabled` (Boolean) Tunneler Enabled Flag
 - `no_traversal` (Boolean) No Traversal Flag
 - `role_attributes` (List of String) Role Attributes
@@ -54,6 +53,7 @@ output "ziti_router_token" {
 
 - `id` (String) Identifier
 - `last_updated` (String) Last Updated Time
+- `enrollment_token` (String, Sensitive) The JWT token for one-time enrollment (OTT).
 
 ## Import
 

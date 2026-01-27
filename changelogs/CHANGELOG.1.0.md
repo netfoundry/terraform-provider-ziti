@@ -1,3 +1,9 @@
+# v1.0.1
+
+## What's New
+
+* Added terraform provider code for identity resource of enrolment type none
+
 # v1.0.0
 
 ## What's New
