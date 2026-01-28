@@ -380,7 +380,7 @@ func (r *jwtSignerResource) Read(ctx context.Context, req resource.ReadRequest, 
 		state.CertPem = types.StringValue(certPem)
 	}
 
-	if kid, ok := data["kid"].(string); ok {
+	if kid, ok := data["kid"].(string); ok && kid != "" {
 		state.Kid = types.StringValue(kid)
 	}
 
