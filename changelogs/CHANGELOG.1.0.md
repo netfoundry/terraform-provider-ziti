@@ -1,3 +1,11 @@
+# v1.0.2
+
+## What's New
+
+* Check for empty kid string in external_jwt_signer
+
+    * [Issue #28](https://github.com/netfoundry/terraform-provider-ziti/issues/28) - ziti_external_jwt_signer always changed
+
 # v1.0.1
 
 ## What's New
