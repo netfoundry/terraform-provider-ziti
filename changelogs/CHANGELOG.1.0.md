@@ -1,3 +1,11 @@
+# v1.0.3
+
+## What's New
+
+* Fix panic error in the common functions logs
+
+    * [Issue #32](https://github.com/netfoundry/terraform-provider-ziti/issues/32) - Provider fails with panic
+
 # v1.0.2
 
 ## What's New
