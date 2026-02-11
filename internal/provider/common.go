@@ -21,7 +21,7 @@ func CreateZitiResource(authUrl string, sessionToken string, payloadData []byte)
 	resp, err := httpClient.Do(req)
 
 	if err != nil {
-		log.Error().Msgf("Got an error back from the Ziti controller: resourceType: %v, Status Code: %v, ERR: %v", authUrl, resp.StatusCode, err)
+		log.Error().Msgf("Got an error back from the Ziti controller: resourceType: %s, ERR: %v", authUrl, err)
 		return "", err
 	}
 
@@ -53,7 +53,7 @@ func ReadZitiResource(authUrl string, sessionToken string) (string, error) {
 	resp, err := httpClient.Do(req)
 
 	if err != nil {
-		log.Error().Msgf("Got an error back from the Ziti controller: resourceType: %v, Status Code: %v, ERR: %v", authUrl, resp.StatusCode, err)
+		log.Error().Msgf("Got an error back from the Ziti controller: resourceType: %s, ERR: %v", authUrl, err)
 		return "", err
 	}
 
@@ -85,7 +85,7 @@ func UpdateZitiResource(authUrl string, sessionToken string, payloadData []byte)
 	resp, err := httpClient.Do(req)
 
 	if err != nil {
-		log.Error().Msgf("Got an error back from the Ziti controller: resourceType: %v, Status Code: %v, ERR: %v", authUrl, resp.StatusCode, err)
+		log.Error().Msgf("Got an error back from the Ziti controller: resourceType: %s, ERR: %v", authUrl, err)
 		return "", err
 	}
 
@@ -117,7 +117,7 @@ func PatchZitiResource(authUrl string, sessionToken string, payloadData []byte) 
 	resp, err := httpClient.Do(req)
 
 	if err != nil {
-		log.Error().Msgf("Got an error back from the Ziti controller: resourceType: %v, Status Code: %v, ERR: %v", authUrl, resp.StatusCode, err)
+		log.Error().Msgf("Got an error back from the Ziti controller: resourceType: %s, ERR: %v", authUrl, err)
 		return "", err
 	}
 
@@ -149,7 +149,7 @@ func DeleteZitiResource(authUrl string, sessionToken string) (string, error) {
 	resp, err := httpClient.Do(req)
 
 	if err != nil {
-		log.Error().Msgf("Got an error back from the Ziti controller: resourceType: %v, Status Code: %v, ERR: %v", authUrl, resp.StatusCode, err)
+		log.Error().Msgf("Got an error back from the Ziti controller: resourceType: %s, ERR: %v", authUrl, err)
 		return "", err
 	}
 
