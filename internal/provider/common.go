@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var errNotFound = errors.New("requested resource was not found")
+
 func doRequest(method, url, sessionToken string, body []byte) (string, error) {
 	httpClient := retryablehttp.NewClient()
 	httpClient.HTTPClient.Transport = &http.Transport{
@@ -22,8 +24,11 @@ func doRequest(method, url, sessionToken string, body []byte) (string, error) {
 	req.Header.Add("zt-session", sessionToken)
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		log.Error().Msgf("Got an error back from the Ziti controller: resourceType: %s, ERR: %v", url, err)
+		log.Error().Msgf("Request failed on url: %s, ERR: %v", url, err)
 		return "", err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return "", errNotFound
 	}
 
 	body, err = io.ReadAll(resp.Body)
