@@ -1,3 +1,11 @@
+# v1.0.4
+
+## What's New
+
+* Do not remove resource from state for timeout response
+
+    * [Issue #34](https://github.com/netfoundry/terraform-provider-ziti/issues/34) - Operation timeout makes resource removed from state
+
 # v1.0.3
 
 ## What's New

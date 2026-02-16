@@ -240,7 +240,7 @@ func (r *postureCheckProcessResource) Read(ctx context.Context, req resource.Rea
 	msg := fmt.Sprintf("Ziti GET Response: %s", cresp)
 	log.Info().Msg(msg)
 	if err != nil {
-		if cresp == "" || IsNotFoundError(err) {
+		if IsNotFoundError(err) {
 			msg := fmt.Sprintf("Resource not found in backend; removing from state, id: %s", state.ID.ValueString())
 			log.Info().Msg(msg)
 			resp.State.RemoveResource(ctx)
