@@ -206,7 +206,6 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 	creq, _ := http.NewRequest("POST", authUrl, bytes.NewBuffer(jsonData))
 	creq.Header.Add("Content-Type", "application/json")
 	cresp, err := httpClient.Do(creq)
-
 	if err != nil {
 		resp.Diagnostics.AddError("Error configuring the API client", err.Error())
 		return

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -237,7 +238,7 @@ func (r *servicePolicyResource) Read(ctx context.Context, req resource.ReadReque
 	msg := fmt.Sprintf("Ziti GET Response: %s", cresp)
 	log.Info().Msg(msg)
 	if err != nil {
-		if cresp == "" || IsNotFoundError(err) {
+		if errors.Is(err, errNotFound) {
 			msg := fmt.Sprintf("Resource not found in backend; removing from state, id: %s", state.ID.ValueString())
 			log.Info().Msg(msg)
 			resp.State.RemoveResource(ctx)
