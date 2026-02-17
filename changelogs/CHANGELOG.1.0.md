@@ -1,3 +1,11 @@
+# v1.0.4
+
+## What's New
+
+* Add retries on request timeouts
+
+    * [Issue #34](https://github.com/netfoundry/terraform-provider-ziti/issues/34) - Operation timeout makes resource removed from state
+
 # v1.0.3
 
 ## What's New
