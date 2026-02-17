@@ -22,11 +22,13 @@ func doRequest(method, url, sessionToken string, body []byte) (string, error) {
 	req, _ := retryablehttp.NewRequest(method, url, bytes.NewBuffer(body))
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("zt-session", sessionToken)
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Error().Msgf("Request failed on url: %s, ERR: %v", url, err)
 		return "", err
 	}
+
 	if resp.StatusCode == http.StatusNotFound {
 		return "", errNotFound
 	}
@@ -34,7 +36,7 @@ func doRequest(method, url, sessionToken string, body []byte) (string, error) {
 	body, err = io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
-		log.Error().Msgf("Error Creating Ziti Resource Response: %v", err)
+		log.Error().Msgf("Error Reading Ziti Resource Response: %v", err)
 		return "", err
 	}
 
