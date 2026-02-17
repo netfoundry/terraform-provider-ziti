@@ -4,7 +4,7 @@
 
 * Add retries on request timeouts
 
-    * [Issue #34](https://github.com/netfoundry/terraform-provider-ziti/issues/34) - Operation timeout makes resource removed from state
+    * [Issue #34](https://github.com/netfoundry/terraform-provider-ziti/issues/34) - Operation timeout makes resource removed from state. Fixed by [@rndmit](https://github.com/rndmit)
 
 # v1.0.3
 
