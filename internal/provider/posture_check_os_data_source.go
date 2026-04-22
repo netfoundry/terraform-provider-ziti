@@ -55,7 +55,7 @@ func (r *postureCheckOSDataSource) Metadata(_ context.Context, req datasource.Me
 type postureCheckOSDataSourceModel struct {
 	ID               types.String `tfsdk:"id"`
 	Name             types.String `tfsdk:"name"`
-	RoleAttributes   types.List   `tfsdk:"role_attributes"`
+	RoleAttributes   types.Set    `tfsdk:"role_attributes"`
 	OperatingSystems types.Set    `tfsdk:"operating_systems"`
 	Tags             types.Map    `tfsdk:"tags"`
 }
@@ -75,7 +75,7 @@ func (r *postureCheckOSDataSource) Schema(_ context.Context, _ datasource.Schema
 				Optional:            true,
 				MarkdownDescription: "Name of the Posture Check",
 			},
-			"role_attributes": schema.ListAttribute{
+			"role_attributes": schema.SetAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
 				MarkdownDescription: "Role Attributes",
@@ -206,11 +206,11 @@ func (r *postureCheckOSDataSource) Read(ctx context.Context, req datasource.Read
 	}
 
 	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {
-		roleAttributes, diag := types.ListValueFrom(ctx, types.StringType, roleAttributes)
+		roleAttributes, diag := types.SetValueFrom(ctx, types.StringType, roleAttributes)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
 		state.RoleAttributes = roleAttributes
 	} else {
-		state.RoleAttributes = types.ListNull(types.StringType)
+		state.RoleAttributes = types.SetNull(types.StringType)
 	}
 
 	if _tags, ok := data["tags"].(map[string]interface{}); ok {

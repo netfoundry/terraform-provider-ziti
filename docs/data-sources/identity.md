@@ -37,7 +37,7 @@ output "ziti_iden" {
 - `default_hosting_precedence` (String) Precedence of the service identity
 - `external_id` (String) External id of the identity.
 - `is_admin` (Boolean) Flag to controls whether an identity has admin rights
-- `role_attributes` (List of String) Role Attributes
+- `role_attributes` (Set of String) Role Attributes
 - `service_hosting_costs` (Map of Number) Service Hosting Costs
 - `service_hosting_precedence` (Map of String) Service Hosting Precedence
 - `tags` (Map of String) Identity Tags

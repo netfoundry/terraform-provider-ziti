@@ -31,9 +31,9 @@ output "ziti_srv" {
 
 ### Read-Only
 
-- `configs` (List of String) Service Configs
+- `configs` (Set of String) Service Configs
 - `encryption_required` (Boolean) Flag which controls Encryption Required
 - `max_idle_milliseconds` (Number) Idle Timeout in milli seconds
-- `role_attributes` (List of String) Role Attributes
+- `role_attributes` (Set of String) Role Attributes
 - `tags` (Map of String) Service Tags
 - `terminator_strategy` (String) Type of Terminator Strategy

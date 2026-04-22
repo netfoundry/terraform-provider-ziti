@@ -32,5 +32,5 @@ output "ziti_check_domains" {
 ### Read-Only
 
 - `domains` (List of String) Windows Domains list
-- `role_attributes` (List of String) Role Attributes
+- `role_attributes` (Set of String) Role Attributes
 - `tags` (Map of String) Posture Check Tags

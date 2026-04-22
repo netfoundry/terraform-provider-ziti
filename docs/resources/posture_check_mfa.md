@@ -32,7 +32,7 @@ resource "ziti_posture_check_mfa" "test_posture_check_mfa" {
 
 - `prompt_on_unlock` (Boolean) Prompt mfa when device unlocks. Defaults to false.
 - `prompt_on_wake` (Boolean) Prompt mfa when device wakes. Defaults to false.
-- `role_attributes` (List of String) Role Attributes
+- `role_attributes` (Set of String) Role Attributes
 - `tags` (Map of String) Posture Check Tags
 - `timeout_seconds` (Number) MFA check time out in seconds. Defaults to -1, which indicates no limit.
 

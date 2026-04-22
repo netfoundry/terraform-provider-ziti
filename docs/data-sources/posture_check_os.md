@@ -32,7 +32,7 @@ output "ziti_check_os" {
 ### Read-Only
 
 - `operating_systems` (Attributes Set) OS List (see [below for nested schema](#nestedatt--operating_systems))
-- `role_attributes` (List of String) Role Attributes
+- `role_attributes` (Set of String) Role Attributes
 - `tags` (Map of String) Posture Check Tags
 
 <a id="nestedatt--operating_systems"></a>

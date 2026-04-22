@@ -2,8 +2,8 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -14,9 +14,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -68,10 +68,10 @@ func (r *serviceResource) Metadata(_ context.Context, req resource.MetadataReque
 type serviceResourceModel struct {
 	ID                      types.String `tfsdk:"id"`
 	Name                    types.String `tfsdk:"name"`
-	Configs                 types.List   `tfsdk:"configs"`
+	Configs                 types.Set    `tfsdk:"configs"`
 	EncryptionRequired      types.Bool   `tfsdk:"encryption_required"`
 	MaxIdleTimeMilliseconds types.Int64  `tfsdk:"max_idle_milliseconds"`
-	RoleAttributes          types.List   `tfsdk:"role_attributes"`
+	RoleAttributes          types.Set    `tfsdk:"role_attributes"`
 	TerminatorStrategy      types.String `tfsdk:"terminator_strategy"`
 	Tags                    types.Map    `tfsdk:"tags"`
 	LastUpdated             types.String `tfsdk:"last_updated"`
@@ -97,11 +97,11 @@ func (r *serviceResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Required:            true,
 				MarkdownDescription: "Name of the Service",
 			},
-			"role_attributes": schema.ListAttribute{
+			"role_attributes": schema.SetAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
 				Optional:            true,
-				Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
+				Default:             setdefault.StaticValue(types.SetNull(types.StringType)),
 				MarkdownDescription: "Role Attributes",
 			},
 			"terminator_strategy": schema.StringAttribute{
@@ -125,11 +125,11 @@ func (r *serviceResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Default:             booldefault.StaticBool(true),
 				MarkdownDescription: "Flag which controls Encryption Required",
 			},
-			"configs": schema.ListAttribute{
+			"configs": schema.SetAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
-				Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
+				Default:             setdefault.StaticValue(types.SetNull(types.StringType)),
 				MarkdownDescription: "Service Configs",
 			},
 			"tags": schema.MapAttribute{
@@ -277,19 +277,19 @@ func (r *serviceResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	if configs, ok := data["configs"].([]interface{}); ok {
-		configs, diag := types.ListValueFrom(ctx, types.StringType, configs)
+		configs, diag := types.SetValueFrom(ctx, types.StringType, configs)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
 		state.Configs = configs
 	} else {
-		state.Configs = types.ListNull(types.StringType)
+		state.Configs = types.SetNull(types.StringType)
 	}
 
 	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {
-		roleAttributes, diag := types.ListValueFrom(ctx, types.StringType, roleAttributes)
+		roleAttributes, diag := types.SetValueFrom(ctx, types.StringType, roleAttributes)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
 		state.RoleAttributes = roleAttributes
 	} else {
-		state.RoleAttributes = types.ListNull(types.StringType)
+		state.RoleAttributes = types.SetNull(types.StringType)
 	}
 
 	if _tags, ok := data["tags"].(map[string]interface{}); ok {
