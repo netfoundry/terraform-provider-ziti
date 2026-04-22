@@ -29,7 +29,7 @@ resource "ziti_posture_check_mac_addresses" "test_posture_check_mac_addresses" {
 
 ### Optional
 
-- `role_attributes` (List of String) Role Attributes
+- `role_attributes` (Set of String) Role Attributes
 - `tags` (Map of String) Posture Check Tags
 
 ### Read-Only

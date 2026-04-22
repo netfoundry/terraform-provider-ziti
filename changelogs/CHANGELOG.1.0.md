@@ -1,3 +1,11 @@
+# v1.0.5
+
+## What's New
+
+* Updated configs schema in services and role attributes schema in all the resources to Set
+
+    * [Issue #40](https://github.com/netfoundry/terraform-provider-ziti/issues/40) - Lists in services re-apply when not in aplhabetical order
+
 # v1.0.4
 
 ## What's New

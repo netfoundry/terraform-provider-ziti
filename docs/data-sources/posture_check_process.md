@@ -32,7 +32,7 @@ output "ziti_check_process" {
 ### Read-Only
 
 - `process` (Attributes) (see [below for nested schema](#nestedatt--process))
-- `role_attributes` (List of String) Role Attributes
+- `role_attributes` (Set of String) Role Attributes
 - `tags` (Map of String) Posture Check Tags
 
 <a id="nestedatt--process"></a>

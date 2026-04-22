@@ -43,7 +43,7 @@ resource "ziti_posture_check_multi_process" "test_posture_check_multi_process" {
 
 ### Optional
 
-- `role_attributes` (List of String) Role Attributes
+- `role_attributes` (Set of String) Role Attributes
 - `semantic` (String) Semantic Value
 - `tags` (Map of String) Posture Check Tags
 

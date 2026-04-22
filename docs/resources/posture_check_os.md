@@ -18,7 +18,7 @@ resource "ziti_posture_check_os" "test_posture_check_os" {
   operating_systems = [
     {
       type     = "Linux"
-      versions = ["1.0.1"]
+      versions = [">=1.1.1 <=1.1.1"]
     }
   ]
 }
@@ -34,7 +34,7 @@ resource "ziti_posture_check_os" "test_posture_check_os" {
 
 ### Optional
 
-- `role_attributes` (List of String) Role Attributes
+- `role_attributes` (Set of String) Role Attributes
 - `tags` (Map of String) Posture Check Tags
 
 ### Read-Only

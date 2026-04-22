@@ -46,7 +46,7 @@ output "ziti_router_token" {
 - `cost` (Number) Cost
 - `is_tunnelerenabled` (Boolean) Tunneler Enabled Flag
 - `no_traversal` (Boolean) No Traversal Flag
-- `role_attributes` (List of String) Role Attributes
+- `role_attributes` (Set of String) Role Attributes
 - `tags` (Map of String) Edge Router Tags
 
 ### Read-Only

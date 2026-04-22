@@ -34,5 +34,5 @@ output "ziti_check_mfa" {
 
 ### Read-Only
 
-- `role_attributes` (List of String) Role Attributes
+- `role_attributes` (Set of String) Role Attributes
 - `tags` (Map of String) Posture Check Tags
