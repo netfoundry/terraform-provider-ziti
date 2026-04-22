@@ -51,7 +51,7 @@ func (r *postureCheckDomainDataSource) Metadata(_ context.Context, req datasourc
 type postureCheckDomainDataSourceModel struct {
 	ID             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
-	RoleAttributes types.List   `tfsdk:"role_attributes"`
+	RoleAttributes types.Set    `tfsdk:"role_attributes"`
 	Domains        types.List   `tfsdk:"domains"`
 	Tags           types.Map    `tfsdk:"tags"`
 }
@@ -71,7 +71,7 @@ func (r *postureCheckDomainDataSource) Schema(_ context.Context, _ datasource.Sc
 				Optional:            true,
 				MarkdownDescription: "Name of the Posture Check",
 			},
-			"role_attributes": schema.ListAttribute{
+			"role_attributes": schema.SetAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
 				MarkdownDescription: "Role Attributes",
@@ -158,11 +158,11 @@ func (r *postureCheckDomainDataSource) Read(ctx context.Context, req datasource.
 	}
 
 	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {
-		roleAttributes, diag := types.ListValueFrom(ctx, types.StringType, roleAttributes)
+		roleAttributes, diag := types.SetValueFrom(ctx, types.StringType, roleAttributes)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
 		state.RoleAttributes = roleAttributes
 	} else {
-		state.RoleAttributes = types.ListNull(types.StringType)
+		state.RoleAttributes = types.SetNull(types.StringType)
 	}
 
 	if _tags, ok := data["tags"].(map[string]interface{}); ok {

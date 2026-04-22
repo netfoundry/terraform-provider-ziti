@@ -2,8 +2,8 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -14,9 +14,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -67,7 +67,7 @@ func (r *postureCheckMacResource) Metadata(_ context.Context, req resource.Metad
 type postureCheckMacResourceModel struct {
 	ID             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
-	RoleAttributes types.List   `tfsdk:"role_attributes"`
+	RoleAttributes types.Set    `tfsdk:"role_attributes"`
 	MacAddresses   types.List   `tfsdk:"mac_addresses"`
 	Tags           types.Map    `tfsdk:"tags"`
 	LastUpdated    types.String `tfsdk:"last_updated"`
@@ -101,11 +101,11 @@ func (r *postureCheckMacResource) Schema(_ context.Context, _ resource.SchemaReq
 				Required:            true,
 				MarkdownDescription: "Name of the Posture Check",
 			},
-			"role_attributes": schema.ListAttribute{
+			"role_attributes": schema.SetAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
 				Optional:            true,
-				Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
+				Default:             setdefault.StaticValue(types.SetNull(types.StringType)),
 				MarkdownDescription: "Role Attributes",
 			},
 			"mac_addresses": schema.ListAttribute{
@@ -266,11 +266,11 @@ func (r *postureCheckMacResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {
-		roleAttributes, diag := types.ListValueFrom(ctx, types.StringType, roleAttributes)
+		roleAttributes, diag := types.SetValueFrom(ctx, types.StringType, roleAttributes)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
 		state.RoleAttributes = roleAttributes
 	} else {
-		state.RoleAttributes = types.ListNull(types.StringType)
+		state.RoleAttributes = types.SetNull(types.StringType)
 	}
 
 	if _tags, ok := data["tags"].(map[string]interface{}); ok {

@@ -2,8 +2,8 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -15,9 +15,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -69,7 +69,7 @@ func (r *identityCaResource) Metadata(_ context.Context, req resource.MetadataRe
 type identityCaResourceModel struct {
 	ID                       types.String `tfsdk:"id"`
 	Name                     types.String `tfsdk:"name"`
-	RoleAttributes           types.List   `tfsdk:"role_attributes"`
+	RoleAttributes           types.Set    `tfsdk:"role_attributes"`
 	AuthPolicyID             types.String `tfsdk:"auth_policy_id"`
 	ExternalID               types.String `tfsdk:"external_id"`
 	IsAdmin                  types.Bool   `tfsdk:"is_admin"`
@@ -105,11 +105,11 @@ func (r *identityCaResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Required:            true,
 				MarkdownDescription: "Name of the Identity",
 			},
-			"role_attributes": schema.ListAttribute{
+			"role_attributes": schema.SetAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
 				Optional:            true,
-				Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
+				Default:             setdefault.StaticValue(types.SetNull(types.StringType)),
 				MarkdownDescription: "Role Attributes",
 			},
 			"auth_policy_id": schema.StringAttribute{
@@ -403,11 +403,11 @@ func (r *identityCaResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {
-		roleAttributes, diag := types.ListValueFrom(ctx, types.StringType, roleAttributes)
+		roleAttributes, diag := types.SetValueFrom(ctx, types.StringType, roleAttributes)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
 		state.RoleAttributes = roleAttributes
 	} else {
-		state.RoleAttributes = types.ListNull(types.StringType)
+		state.RoleAttributes = types.SetNull(types.StringType)
 	}
 
 	if serviceHostingCosts, ok := data["serviceHostingCosts"].(map[string]interface{}); ok {

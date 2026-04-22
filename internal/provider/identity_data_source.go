@@ -51,7 +51,7 @@ func (r *identityDataSource) Metadata(_ context.Context, req datasource.Metadata
 type identityDataSourceModel struct {
 	ID                       types.String `tfsdk:"id"`
 	Name                     types.String `tfsdk:"name"`
-	RoleAttributes           types.List   `tfsdk:"role_attributes"`
+	RoleAttributes           types.Set    `tfsdk:"role_attributes"`
 	AuthPolicyID             types.String `tfsdk:"auth_policy_id"`
 	ExternalID               types.String `tfsdk:"external_id"`
 	IsAdmin                  types.Bool   `tfsdk:"is_admin"`
@@ -79,7 +79,7 @@ func (r *identityDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				Optional:            true,
 				MarkdownDescription: "Name of the Identity",
 			},
-			"role_attributes": schema.ListAttribute{
+			"role_attributes": schema.SetAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
 				MarkdownDescription: "Role Attributes",
@@ -224,11 +224,11 @@ func (r *identityDataSource) Read(ctx context.Context, req datasource.ReadReques
 	}
 
 	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {
-		roleAttributes, diag := types.ListValueFrom(ctx, types.StringType, roleAttributes)
+		roleAttributes, diag := types.SetValueFrom(ctx, types.StringType, roleAttributes)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
 		state.RoleAttributes = roleAttributes
 	} else {
-		state.RoleAttributes = types.ListNull(types.StringType)
+		state.RoleAttributes = types.SetNull(types.StringType)
 	}
 
 	if serviceHostingCosts, ok := data["serviceHostingCosts"].(map[string]interface{}); ok {

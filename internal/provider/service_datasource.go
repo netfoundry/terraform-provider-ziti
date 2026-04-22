@@ -51,10 +51,10 @@ func (r *serviceDataSource) Metadata(_ context.Context, req datasource.MetadataR
 type serviceDataSourceModel struct {
 	ID                      types.String `tfsdk:"id"`
 	Name                    types.String `tfsdk:"name"`
-	Configs                 types.List   `tfsdk:"configs"`
+	Configs                 types.Set    `tfsdk:"configs"`
 	EncryptionRequired      types.Bool   `tfsdk:"encryption_required"`
 	MaxIdleTimeMilliseconds types.Int64  `tfsdk:"max_idle_milliseconds"`
-	RoleAttributes          types.List   `tfsdk:"role_attributes"`
+	RoleAttributes          types.Set    `tfsdk:"role_attributes"`
 	TerminatorStrategy      types.String `tfsdk:"terminator_strategy"`
 	Tags                    types.Map    `tfsdk:"tags"`
 }
@@ -74,7 +74,7 @@ func (r *serviceDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 				Optional:            true,
 				MarkdownDescription: "Name of the Service",
 			},
-			"role_attributes": schema.ListAttribute{
+			"role_attributes": schema.SetAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
 				MarkdownDescription: "Role Attributes",
@@ -91,7 +91,7 @@ func (r *serviceDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 				Computed:            true,
 				MarkdownDescription: "Flag which controls Encryption Required",
 			},
-			"configs": schema.ListAttribute{
+			"configs": schema.SetAttribute{
 				ElementType:         types.StringType,
 				Computed:            true,
 				MarkdownDescription: "Service Configs",
@@ -179,19 +179,19 @@ func (r *serviceDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	}
 
 	if configs, ok := data["configs"].([]interface{}); ok {
-		configs, diag := types.ListValueFrom(ctx, types.StringType, configs)
+		configs, diag := types.SetValueFrom(ctx, types.StringType, configs)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
 		state.Configs = configs
 	} else {
-		state.Configs = types.ListNull(types.StringType)
+		state.Configs = types.SetNull(types.StringType)
 	}
 
 	if roleAttributes, ok := data["roleAttributes"].([]interface{}); ok {
-		roleAttributes, diag := types.ListValueFrom(ctx, types.StringType, roleAttributes)
+		roleAttributes, diag := types.SetValueFrom(ctx, types.StringType, roleAttributes)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
 		state.RoleAttributes = roleAttributes
 	} else {
-		state.RoleAttributes = types.ListNull(types.StringType)
+		state.RoleAttributes = types.SetNull(types.StringType)
 	}
 
 	if _tags, ok := data["tags"].(map[string]interface{}); ok {
