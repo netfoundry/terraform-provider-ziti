@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
@@ -62,7 +65,12 @@ func (p *zitiProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp 
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "Ziti Host/Domain URL",
+				MarkdownDescription: "Ziti controller Host/Domain URL. Use `hosts` to configure multiple controllers for HA failover.",
+			},
+			"hosts": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "List of Ziti controller Host/Domain URLs for HA failover. First successful authentication wins. Finds and prefers the leader",
 			},
 			"username": schema.StringAttribute{
 				Optional:            true,
@@ -80,13 +88,110 @@ func (p *zitiProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp 
 // zitiProviderModel maps provider schema data to a Go type.
 type zitiProviderModel struct {
 	Host     types.String `tfsdk:"host"`
+	Hosts    types.List   `tfsdk:"hosts"`
 	Username types.String `tfsdk:"username"`
 	Password types.String `tfsdk:"password"`
 }
 
+// tryAuthenticate authenticates against a single Ziti controller and returns the session token.
+func tryAuthenticate(host, username, password string) (string, error) {
+	payload := map[string]interface{}{
+		"username": username,
+		"password": password,
+	}
+	jsonData, _ := json.Marshal(payload)
+	authUrl := fmt.Sprintf("%s/authenticate?method=password", host)
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   15 * time.Second,
+	}
+	creq, err := http.NewRequest("POST", authUrl, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", fmt.Errorf("failed to build auth request: %w", err)
+	}
+	creq.Header.Add("Content-Type", "application/json")
+	cresp, err := httpClient.Do(creq)
+	if err != nil {
+		return "", fmt.Errorf("auth request failed: %w", err)
+	}
+	body, err := io.ReadAll(cresp.Body)
+	defer cresp.Body.Close()
+	if err != nil {
+		return "", fmt.Errorf("error reading auth response: %w", err)
+	}
+	if cresp.StatusCode != http.StatusOK && cresp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("status %d: %s", cresp.StatusCode, string(body))
+	}
+	token := gjson.GetBytes(body, "data.token").String()
+	if token == "" {
+		return "", fmt.Errorf("no token returned in auth response")
+	}
+	return token, nil
+}
+
+type clusterMember struct {
+	Address   string `json:"address"`
+	Connected bool   `json:"connected"`
+	ID        string `json:"id"`
+	Leader    bool   `json:"leader"`
+	ReadOnly  bool   `json:"readOnly"`
+	Version   string `json:"version"`
+	Voter     bool   `json:"voter"`
+}
+
+// fetchClusterMembers calls /fabric/v1/cluster/list-members and returns the member list.
+func fetchClusterMembers(activeHost, token string) ([]clusterMember, error) {
+	u, err := url.Parse(activeHost)
+	if err != nil {
+		return nil, fmt.Errorf("invalid host URL: %w", err)
+	}
+	clusterURL := fmt.Sprintf("%s://%s/fabric/v1/cluster/list-members", u.Scheme, u.Host)
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	httpClient := &http.Client{Transport: transport, Timeout: 15 * time.Second}
+	req, err := http.NewRequest("GET", clusterURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build cluster request: %w", err)
+	}
+	req.Header.Set("zt-session", token)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("cluster request failed: %w", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("error reading cluster response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("cluster list-members status %d: %s", resp.StatusCode, string(body))
+	}
+	var result struct {
+		Data []clusterMember `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("error parsing cluster response: %w", err)
+	}
+	return result.Data, nil
+}
+
+// memberToHost converts a cluster member tls address (e.g. "tls:HOST:PORT") to
+// an https URL preserving the base path of the original host.
+func memberToHost(address, originalHost string) (string, error) {
+	addr := strings.TrimPrefix(address, "tls:")
+	u, err := url.Parse(originalHost)
+	if err != nil {
+		return "", fmt.Errorf("invalid original host: %w", err)
+	}
+	return fmt.Sprintf("https://%s%s", addr, u.Path), nil
+}
+
 func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	tflog.Info(ctx, "Configuring ziti client")
-	// Retrieve provider data from configuration
 	var config zitiProviderModel
 	diags := req.Config.Get(ctx, &config)
 	resp.Diagnostics.Append(diags...)
@@ -94,15 +199,21 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
-	// If practitioner provided a configuration value for any of the
-	// attributes, it must be a known value.
-
 	if config.Host.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("host"),
 			"Unknown ziti API Host",
 			"The provider cannot create the ziti API client as there is an unknown configuration value for the API host. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the ZITI_HOST environment variable.",
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the ZITI_API_HOST environment variable.",
+		)
+	}
+
+	if config.Hosts.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("hosts"),
+			"Unknown ziti API Hosts",
+			"The provider cannot create the ziti API client as there is an unknown configuration value for the API hosts list. "+
+				"Either target apply the source of the value first or set the values statically in the configuration.",
 		)
 	}
 
@@ -111,7 +222,7 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 			path.Root("username"),
 			"Unknown ziti API Username",
 			"The provider cannot create the ziti API client as there is an unknown configuration value for the API username. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the ZITI_USERNAME environment variable.",
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the ZITI_API_USERNAME environment variable.",
 		)
 	}
 
@@ -120,7 +231,7 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 			path.Root("password"),
 			"Unknown ziti API Password",
 			"The provider cannot create the ziti API client as there is an unknown configuration value for the API password. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the ZITI_PASSWORD environment variable.",
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the ZITI_API_PASSWORD environment variable.",
 		)
 	}
 
@@ -128,16 +239,8 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
-	// Default values to environment variables, but override
-	// with Terraform configuration value if set.
-
-	host := os.Getenv("ZITI_API_HOST")
 	username := os.Getenv("ZITI_API_USERNAME")
 	password := os.Getenv("ZITI_API_PASSWORD")
-
-	if !config.Host.IsNull() {
-		host = config.Host.ValueString()
-	}
 
 	if !config.Username.IsNull() {
 		username = config.Username.ValueString()
@@ -147,25 +250,12 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		password = config.Password.ValueString()
 	}
 
-	// If any of the expected configurations are missing, return
-	// errors with provider-specific guidance.
-
-	if host == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
-			"Missing ZITI API Host",
-			"The provider cannot create the ziti API client as there is a missing or empty value for the ziti API host. "+
-				"Set the host value in the configuration or use the ZITI_HOST environment variable. "+
-				"If either is already set, ensure the value is not empty.",
-		)
-	}
-
 	if username == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("username"),
 			"Missing ziti API Username",
-			"The provider cannot create the ziti API client as there is a missing or empty value for the zitiAPI username. "+
-				"Set the username value in the configuration or use the ZITI_USERNAME environment variable. "+
+			"The provider cannot create the ziti API client as there is a missing or empty value for the ziti API username. "+
+				"Set the username value in the configuration or use the ZITI_API_USERNAME environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
@@ -175,7 +265,7 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 			path.Root("password"),
 			"Missing ziti API Password",
 			"The provider cannot create the ziti API client as there is a missing or empty value for the ziti API password. "+
-				"Set the password value in the configuration or use the ZITI_PASSWORD environment variable. "+
+				"Set the password value in the configuration or use the ZITI_API_PASSWORD environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
@@ -184,68 +274,126 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
-	ctx = tflog.SetField(ctx, "ziti_host", host)
-	ctx = tflog.SetField(ctx, "ziti_username", username)
-	ctx = tflog.SetField(ctx, "ziti_password", password)
-
-	tflog.Debug(ctx, "Creating ziti client")
-
-	payload := map[string]interface{}{
-		"username": username,
-		"password": password,
-	}
-
-	// Convert the payload to JSON
-	jsonData, _ := json.Marshal(payload)
-
-	authUrl := fmt.Sprintf("%s/authenticate?method=password", host)
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	httpClient := &http.Client{Transport: transport}
-	creq, _ := http.NewRequest("POST", authUrl, bytes.NewBuffer(jsonData))
-	creq.Header.Add("Content-Type", "application/json")
-	cresp, err := httpClient.Do(creq)
-	if err != nil {
-		resp.Diagnostics.AddError("Error configuring the API client", err.Error())
-		return
-	}
-
-	body, err := io.ReadAll(cresp.Body)
-	defer cresp.Body.Close()
-	if err != nil {
-		log.Error().Msgf("Error Reading Ziti Resource Response: %v", err)
-	}
-
-	stringBody := string(body)
-	if cresp.StatusCode != http.StatusOK {
-		if cresp.StatusCode != http.StatusCreated {
-			resp.Diagnostics.AddError("Unexpected error: %s", string(body))
-			return
+	// Build an ordered, deduplicated list of controllers to try.
+	// 'host' is prepended first so existing single-host configs are unaffected.
+	// 'hosts' elements follow for HA failover.
+	// Falls back to ZITI_API_HOST only when neither attribute provides any value.
+	var allHosts []string
+	multiHost := false
+	seen := make(map[string]bool)
+	addHost := func(h string) {
+		if h != "" && !seen[h] {
+			seen[h] = true
+			allHosts = append(allHosts, h)
 		}
 	}
 
-	var jsonBody map[string]interface{}
-	err = json.Unmarshal(body, &jsonBody)
-	if err != nil {
-		log.Error().Msgf("Error unmarshalling JSON response from Ziti Resource Response: %v", err)
+	if !config.Host.IsNull() {
+		addHost(config.Host.ValueString())
+	}
+
+	if !config.Hosts.IsNull() {
+		var hostList []string
+		diags = config.Hosts.ElementsAs(ctx, &hostList, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		for _, h := range hostList {
+			addHost(h)
+		}
+		multiHost = len(hostList) > 0
+	}
+
+	if len(allHosts) == 0 {
+		addHost(os.Getenv("ZITI_API_HOST"))
+	}
+
+	if len(allHosts) == 0 {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("host"),
+			"Missing ZITI API Host",
+			"The provider cannot create the ziti API client as there is a missing or empty value for the ziti API host. "+
+				"Set the 'host' value, the 'hosts' list in the configuration, or use the ZITI_API_HOST environment variable.",
+		)
 		return
 	}
 
-	zitiToken := gjson.Get(stringBody, "data.token").String()
+	ctx = tflog.SetField(ctx, "ziti_username", username)
+	tflog.Debug(ctx, "Creating ziti client")
+
+	// Try each controller in order; use the first one that authenticates.
+	var activeHost, zitiToken string
+	var authErrs []string
+	for _, h := range allHosts {
+		token, err := tryAuthenticate(h, username, password)
+		if err != nil {
+			log.Warn().Msgf("Failed to authenticate with Ziti controller %s: %v", h, err)
+			authErrs = append(authErrs, fmt.Sprintf("%s: %v", h, err))
+			continue
+		}
+		activeHost = h
+		zitiToken = token
+		break
+	}
+
+	if activeHost == "" {
+		resp.Diagnostics.AddError(
+			"Failed to authenticate with any configured Ziti controller",
+			strings.Join(authErrs, "; "),
+		)
+		return
+	}
+
+	// When multiple hosts are configured, discover cluster members and re-authenticate
+	// against each one, preferring the leader.
+	if multiHost {
+		members, err := fetchClusterMembers(activeHost, zitiToken)
+		if err != nil {
+			log.Warn().Msgf("Could not fetch cluster members from %s: %v", activeHost, err)
+		} else {
+			// Sort so the leader is tried first.
+			leaderFirst := make([]clusterMember, 0, len(members))
+			for _, m := range members {
+				if m.Leader {
+					leaderFirst = append([]clusterMember{m}, leaderFirst...)
+				} else {
+					leaderFirst = append(leaderFirst, m)
+				}
+			}
+			for _, m := range leaderFirst {
+				if !m.Connected {
+					continue
+				}
+				memberHost, err := memberToHost(m.Address, activeHost)
+				if err != nil {
+					log.Warn().Msgf("Skipping cluster member %s (bad address %q): %v", m.ID, m.Address, err)
+					continue
+				}
+				token, err := tryAuthenticate(memberHost, username, password)
+				if err != nil {
+					log.Warn().Msgf("Auth failed for cluster member %s (%s): %v", m.ID, memberHost, err)
+					continue
+				}
+				log.Info().Msgf("Using cluster member %s (leader=%v) at %s", m.ID, m.Leader, memberHost)
+				activeHost = memberHost
+				zitiToken = token
+				break
+			}
+		}
+	}
+
 	fmt.Printf("Using zitiToken: %s\n", zitiToken)
 
-	// Make the HashiCups client available during DataSource and Resource
-	// type Configure methods.
 	resourceData := zitiData{
 		apiToken: zitiToken,
-		host:     host,
+		host:     activeHost,
 	}
 
 	resp.DataSourceData = &resourceData
 	resp.ResourceData = &resourceData
 
-	tflog.Info(ctx, "Configured ziti client", map[string]any{"success": true})
+	tflog.Info(ctx, "Configured ziti client", map[string]any{"success": true, "host": activeHost})
 }
 
 // DataSources defines the data sources implemented in the provider.
