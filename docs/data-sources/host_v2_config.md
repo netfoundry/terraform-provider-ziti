@@ -46,6 +46,7 @@ Read-Only:
 - `allowed_protocols` (List of String) Protocols that can be forwarded.
 - `allowed_source_addresses` (List of String) Source addresses that can be forwarded.
 - `forward_address` (Boolean) Flag which controls whether to forward allowedAddresses
+- `forward_address_translations` (Attributes List) Address translations to forward. (see [below for nested schema](#nestedatt--terminators--forward_address_translations))
 - `forward_port` (Boolean) Flag which controls whether to forward allowedPortRanges
 - `forward_protocol` (Boolean) Flag which controls whether to forward allowedProtocols
 - `http_checks` (Attributes List) HTTP Checks. (see [below for nested schema](#nestedatt--terminators--http_checks))
@@ -62,6 +63,16 @@ Read-Only:
 
 - `high` (Number)
 - `low` (Number)
+
+
+<a id="nestedatt--terminators--forward_address_translations"></a>
+### Nested Schema for `terminators.forward_address_translations`
+
+Read-Only:
+
+- `from` (String)
+- `prefix_length` (Number)
+- `to` (String)
 
 
 <a id="nestedatt--terminators--http_checks"></a>

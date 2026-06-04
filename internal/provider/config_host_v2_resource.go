@@ -2,8 +2,8 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -71,20 +71,21 @@ func (r *hostV2ConfigResource) Metadata(_ context.Context, req resource.Metadata
 
 var HostConfigModel = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
-		"address":                  types.StringType,
-		"port":                     types.Int32Type,
-		"protocol":                 types.StringType,
-		"forward_protocol":         types.BoolType,
-		"forward_port":             types.BoolType,
-		"forward_address":          types.BoolType,
-		"allowed_protocols":        types.ListType{ElemType: types.StringType},
-		"allowed_addresses":        types.ListType{ElemType: types.StringType},
-		"allowed_source_addresses": types.ListType{ElemType: types.StringType},
-		"allowed_port_ranges":      types.ListType{ElemType: AllowedPortRangeModel},
-		"listen_options":           ListenOptionsModel,
-		"proxy":                    ProxyModel,
-		"http_checks":              types.ListType{ElemType: HTTPCheckModel},
-		"port_checks":              types.ListType{ElemType: PortCheckModel},
+		"address":                      types.StringType,
+		"port":                         types.Int32Type,
+		"protocol":                     types.StringType,
+		"forward_protocol":             types.BoolType,
+		"forward_port":                 types.BoolType,
+		"forward_address":              types.BoolType,
+		"allowed_protocols":            types.ListType{ElemType: types.StringType},
+		"allowed_addresses":            types.ListType{ElemType: types.StringType},
+		"allowed_source_addresses":     types.ListType{ElemType: types.StringType},
+		"forward_address_translations": types.ListType{ElemType: ForwardAddressTranslationModel},
+		"allowed_port_ranges":          types.ListType{ElemType: AllowedPortRangeModel},
+		"listen_options":               ListenOptionsModel,
+		"proxy":                        ProxyModel,
+		"http_checks":                  types.ListType{ElemType: HTTPCheckModel},
+		"port_checks":                  types.ListType{ElemType: PortCheckModel},
 	},
 }
 
@@ -179,6 +180,25 @@ func (r *hostV2ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 							Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
 							MarkdownDescription: "Source addresses that can be forwarded.",
 						},
+						"forward_address_translations": schema.ListNestedAttribute{
+							Optional:            true,
+							Computed:            true,
+							Default:             listdefault.StaticValue(types.ListNull(ForwardAddressTranslationModel)),
+							MarkdownDescription: "Address translations to forward.",
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"from": schema.StringAttribute{
+										Required: true,
+									},
+									"to": schema.StringAttribute{
+										Required: true,
+									},
+									"prefix_length": schema.Int32Attribute{
+										Required: true,
+									},
+								},
+							},
+						},
 						"proxy": schema.SingleNestedAttribute{
 							Optional: true,
 							Attributes: map[string]schema.Attribute{
@@ -205,12 +225,12 @@ func (r *hostV2ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 								},
 								"connect_timeout": schema.StringAttribute{
 									Optional: true,
-									Computed: true,
+									//Computed: true,
 									//Default:  stringdefault.StaticString("5s"),
 								},
 								"cost": schema.Int32Attribute{
 									Optional: true,
-									Computed: true,
+									//Computed: true,
 									//Default:  int32default.StaticInt32(0),
 									Validators: []validator.Int32{
 										int32validator.Between(0, 65535),
@@ -218,7 +238,7 @@ func (r *hostV2ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 								},
 								"max_connections": schema.Int32Attribute{
 									Optional: true,
-									Computed: true,
+									//Computed: true,
 									//Default:  int32default.StaticInt32(65535),
 									Validators: []validator.Int32{
 										int32validator.Between(1, 65535),
@@ -405,38 +425,40 @@ func (r *hostV2ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 }
 
 type hostV2Config struct {
-	Address                types.String `tfsdk:"address"`
-	Port                   types.Int32  `tfsdk:"port"`
-	Protocol               types.String `tfsdk:"protocol"`
-	ForwardProtocol        types.Bool   `tfsdk:"forward_protocol"`
-	ForwardPort            types.Bool   `tfsdk:"forward_port"`
-	ForwardAddress         types.Bool   `tfsdk:"forward_address"`
-	AllowedProtocols       types.List   `tfsdk:"allowed_protocols"`
-	AllowedAddresses       types.List   `tfsdk:"allowed_addresses"`
-	AllowedSourceAddresses types.List   `tfsdk:"allowed_source_addresses"`
-	AllowedPortRanges      types.List   `tfsdk:"allowed_port_ranges"`
-	ListenOptions          types.Object `tfsdk:"listen_options"`
-	Proxy                  types.Object `tfsdk:"proxy"`
-	PortChecks             types.List   `tfsdk:"port_checks"`
-	HTTPChecks             types.List   `tfsdk:"http_checks"`
+	Address                    types.String `tfsdk:"address"`
+	Port                       types.Int32  `tfsdk:"port"`
+	Protocol                   types.String `tfsdk:"protocol"`
+	ForwardProtocol            types.Bool   `tfsdk:"forward_protocol"`
+	ForwardPort                types.Bool   `tfsdk:"forward_port"`
+	ForwardAddress             types.Bool   `tfsdk:"forward_address"`
+	AllowedProtocols           types.List   `tfsdk:"allowed_protocols"`
+	AllowedAddresses           types.List   `tfsdk:"allowed_addresses"`
+	AllowedSourceAddresses     types.List   `tfsdk:"allowed_source_addresses"`
+	ForwardAddressTranslations types.List   `tfsdk:"forward_address_translations"`
+	AllowedPortRanges          types.List   `tfsdk:"allowed_port_ranges"`
+	ListenOptions              types.Object `tfsdk:"listen_options"`
+	Proxy                      types.Object `tfsdk:"proxy"`
+	PortChecks                 types.List   `tfsdk:"port_checks"`
+	HTTPChecks                 types.List   `tfsdk:"http_checks"`
 }
 
 func (m hostV2Config) ToTerraformObject(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
 	attrs := map[string]attr.Value{
-		"address":                  m.Address,
-		"port":                     m.Port,
-		"protocol":                 m.Protocol,
-		"forward_protocol":         m.ForwardProtocol,
-		"forward_port":             m.ForwardPort,
-		"forward_address":          m.ForwardAddress,
-		"allowed_protocols":        m.AllowedProtocols,
-		"allowed_addresses":        m.AllowedAddresses,
-		"allowed_source_addresses": m.AllowedSourceAddresses,
-		"allowed_port_ranges":      m.AllowedPortRanges,
-		"listen_options":           m.ListenOptions,
-		"proxy":                    m.Proxy,
-		"http_checks":              m.HTTPChecks,
-		"port_checks":              m.PortChecks,
+		"address":                      m.Address,
+		"port":                         m.Port,
+		"protocol":                     m.Protocol,
+		"forward_protocol":             m.ForwardProtocol,
+		"forward_port":                 m.ForwardPort,
+		"forward_address":              m.ForwardAddress,
+		"allowed_protocols":            m.AllowedProtocols,
+		"allowed_addresses":            m.AllowedAddresses,
+		"allowed_source_addresses":     m.AllowedSourceAddresses,
+		"forward_address_translations": m.ForwardAddressTranslations,
+		"allowed_port_ranges":          m.AllowedPortRanges,
+		"listen_options":               m.ListenOptions,
+		"proxy":                        m.Proxy,
+		"http_checks":                  m.HTTPChecks,
+		"port_checks":                  m.PortChecks,
 	}
 
 	//return basetypes.NewObjectValue(hostV2ConfigModelAttrTypes(), attrs)
@@ -449,20 +471,21 @@ func hostV2ConfigModelType() types.ObjectType {
 
 func hostV2ConfigModelAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"address":                  types.StringType,
-		"port":                     types.Int32Type,
-		"protocol":                 types.StringType,
-		"forward_protocol":         types.BoolType,
-		"forward_port":             types.BoolType,
-		"forward_address":          types.BoolType,
-		"allowed_protocols":        types.ListType{ElemType: types.StringType},
-		"allowed_addresses":        types.ListType{ElemType: types.StringType},
-		"allowed_source_addresses": types.ListType{ElemType: types.StringType},
-		"allowed_port_ranges":      types.ListType{ElemType: AllowedPortRangeModel},
-		"listen_options":           ListenOptionsModel,
-		"proxy":                    ProxyModel,
-		"http_checks":              types.ListType{ElemType: HTTPCheckModel},
-		"port_checks":              types.ListType{ElemType: PortCheckModel},
+		"address":                      types.StringType,
+		"port":                         types.Int32Type,
+		"protocol":                     types.StringType,
+		"forward_protocol":             types.BoolType,
+		"forward_port":                 types.BoolType,
+		"forward_address":              types.BoolType,
+		"allowed_protocols":            types.ListType{ElemType: types.StringType},
+		"allowed_addresses":            types.ListType{ElemType: types.StringType},
+		"allowed_source_addresses":     types.ListType{ElemType: types.StringType},
+		"forward_address_translations": types.ListType{ElemType: ForwardAddressTranslationModel},
+		"allowed_port_ranges":          types.ListType{ElemType: AllowedPortRangeModel},
+		"listen_options":               ListenOptionsModel,
+		"proxy":                        ProxyModel,
+		"http_checks":                  types.ListType{ElemType: HTTPCheckModel},
+		"port_checks":                  types.ListType{ElemType: PortCheckModel},
 	}
 }
 
@@ -479,6 +502,7 @@ func (dto *HostConfigDTO) ConvertToZitiResourceModel2(ctx context.Context) hostV
 	res.AllowedProtocols = convertStringList(ctx, dto.AllowedProtocols, types.StringType)
 	res.AllowedAddresses = convertStringList(ctx, dto.AllowedAddresses, types.StringType)
 	res.AllowedSourceAddresses = convertStringList(ctx, dto.AllowedSourceAddresses, types.StringType)
+	res.ForwardAddressTranslations = convertFATDTOToTerraformList(ctx, dto.ForwardAddressTranslations)
 
 	if dto.AllowedPortRanges != nil {
 		var objects []attr.Value
@@ -610,6 +634,12 @@ func (r *hostV2ConfigResource) Create(ctx context.Context, req resource.CreateRe
 						}
 						*dto.AllowedPortRanges = append(*dto.AllowedPortRanges, aprDTO)
 					}
+				}
+
+				// forward_address_translations
+				if fatAttr, exists := obj.Attributes()["forward_address_translations"]; exists && !fatAttr.IsNull() && !fatAttr.IsUnknown() {
+					fatList, _ := fatAttr.(types.List)
+					dto.ForwardAddressTranslations = convertFATElementsToDTO(fatList.Elements())
 				}
 
 				terminators = append(terminators, dto)
@@ -843,6 +873,12 @@ func (r *hostV2ConfigResource) Update(ctx context.Context, req resource.UpdateRe
 						}
 						*dto.AllowedPortRanges = append(*dto.AllowedPortRanges, aprDTO)
 					}
+				}
+
+				// forward_address_translations
+				if fatAttr, exists := obj.Attributes()["forward_address_translations"]; exists && !fatAttr.IsNull() && !fatAttr.IsUnknown() {
+					fatList, _ := fatAttr.(types.List)
+					dto.ForwardAddressTranslations = convertFATElementsToDTO(fatList.Elements())
 				}
 
 				terminators = append(terminators, dto)

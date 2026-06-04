@@ -2,8 +2,8 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -98,6 +98,14 @@ var HTTPCheckModel = types.ObjectType{
 	},
 }
 
+var ForwardAddressTranslationModel = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"from":          types.StringType,
+		"to":            types.StringType,
+		"prefix_length": types.Int32Type,
+	},
+}
+
 // Configure adds the provider configured client to the resource.
 func (r *hostV1ConfigResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Add a nil check when handling ProviderData because Terraform
@@ -120,25 +128,26 @@ func (r *hostV1ConfigResource) Metadata(_ context.Context, req resource.Metadata
 
 // hostV1ConfigResourceModel maps the resource schema data.
 type hostV1ConfigResourceModel struct {
-	ID                     types.String `tfsdk:"id"`
-	Name                   types.String `tfsdk:"name"`
-	Address                types.String `tfsdk:"address"`
-	ConfigTypeId           types.String `tfsdk:"config_type_id"`
-	Port                   types.Int32  `tfsdk:"port"`
-	Protocol               types.String `tfsdk:"protocol"`
-	ForwardProtocol        types.Bool   `tfsdk:"forward_protocol"`
-	ForwardPort            types.Bool   `tfsdk:"forward_port"`
-	ForwardAddress         types.Bool   `tfsdk:"forward_address"`
-	AllowedProtocols       types.List   `tfsdk:"allowed_protocols"`
-	AllowedAddresses       types.List   `tfsdk:"allowed_addresses"`
-	AllowedSourceAddresses types.List   `tfsdk:"allowed_source_addresses"`
-	AllowedPortRanges      types.List   `tfsdk:"allowed_port_ranges"`
-	ListenOptions          types.Object `tfsdk:"listen_options"`
-	Proxy                  types.Object `tfsdk:"proxy"`
-	PortChecks             types.List   `tfsdk:"port_checks"`
-	HTTPChecks             types.List   `tfsdk:"http_checks"`
-	Tags                   types.Map    `tfsdk:"tags"`
-	LastUpdated            types.String `tfsdk:"last_updated"`
+	ID                         types.String `tfsdk:"id"`
+	Name                       types.String `tfsdk:"name"`
+	Address                    types.String `tfsdk:"address"`
+	ConfigTypeId               types.String `tfsdk:"config_type_id"`
+	Port                       types.Int32  `tfsdk:"port"`
+	Protocol                   types.String `tfsdk:"protocol"`
+	ForwardProtocol            types.Bool   `tfsdk:"forward_protocol"`
+	ForwardPort                types.Bool   `tfsdk:"forward_port"`
+	ForwardAddress             types.Bool   `tfsdk:"forward_address"`
+	AllowedProtocols           types.List   `tfsdk:"allowed_protocols"`
+	AllowedAddresses           types.List   `tfsdk:"allowed_addresses"`
+	AllowedSourceAddresses     types.List   `tfsdk:"allowed_source_addresses"`
+	ForwardAddressTranslations types.List   `tfsdk:"forward_address_translations"`
+	AllowedPortRanges          types.List   `tfsdk:"allowed_port_ranges"`
+	ListenOptions              types.Object `tfsdk:"listen_options"`
+	Proxy                      types.Object `tfsdk:"proxy"`
+	PortChecks                 types.List   `tfsdk:"port_checks"`
+	HTTPChecks                 types.List   `tfsdk:"http_checks"`
+	Tags                       types.Map    `tfsdk:"tags"`
+	LastUpdated                types.String `tfsdk:"last_updated"`
 }
 
 // Schema defines the schema for the resource.
@@ -204,6 +213,25 @@ func (r *hostV1ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:            true,
 				Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
 				MarkdownDescription: "Source addresses that can be forwarded.",
+			},
+			"forward_address_translations": schema.ListNestedAttribute{
+				Optional:            true,
+				Computed:            true,
+				Default:             listdefault.StaticValue(types.ListNull(ForwardAddressTranslationModel)),
+				MarkdownDescription: "Address translations to forward.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"from": schema.StringAttribute{
+							Required: true,
+						},
+						"to": schema.StringAttribute{
+							Required: true,
+						},
+						"prefix_length": schema.Int32Attribute{
+							Required: true,
+						},
+					},
+				},
 			},
 			"proxy": schema.SingleNestedAttribute{
 				Optional: true,
@@ -473,21 +501,28 @@ type PortCheckDTO struct {
 	Actions  *[]CheckActionDTO `json:"actions"`
 }
 
+type ForwardAddressTranslationDTO struct {
+	From         *string `json:"from,omitempty"`
+	To           *string `json:"to,omitempty"`
+	PrefixLength *int32  `json:"prefixLength,omitempty"`
+}
+
 type HostConfigDTO struct {
-	Address                *string           `json:"address,omitempty"`
-	Port                   *int32            `json:"port,omitempty"`
-	Protocol               *string           `json:"protocol,omitempty"`
-	ForwardProtocol        *bool             `json:"forwardProtocol,omitempty"`
-	ForwardPort            *bool             `json:"forwardPort,omitempty"`
-	ForwardAddress         *bool             `json:"forwardAddress,omitempty"`
-	AllowedProtocols       *[]string         `json:"allowedProtocols,omitempty"`
-	AllowedAddresses       *[]string         `json:"allowedAddresses,omitempty"`
-	AllowedSourceAddresses *[]string         `json:"allowedSourceAddresses,omitempty"`
-	AllowedPortRanges      *[]ConfigPortsDTO `json:"allowedPortRanges,omitempty"`
-	ListenOptions          *ListenOptionsDTO `json:"listenOptions,omitempty"`
-	Proxy                  *ProxyDTO         `json:"proxy,omitempty"`
-	HTTPChecks             *[]HTTPCheckDTO   `json:"httpChecks,omitempty"`
-	PortChecks             *[]PortCheckDTO   `json:"portChecks,omitempty"`
+	Address                    *string                         `json:"address,omitempty"`
+	Port                       *int32                          `json:"port,omitempty"`
+	Protocol                   *string                         `json:"protocol,omitempty"`
+	ForwardProtocol            *bool                           `json:"forwardProtocol,omitempty"`
+	ForwardPort                *bool                           `json:"forwardPort,omitempty"`
+	ForwardAddress             *bool                           `json:"forwardAddress,omitempty"`
+	AllowedProtocols           *[]string                       `json:"allowedProtocols,omitempty"`
+	AllowedAddresses           *[]string                       `json:"allowedAddresses,omitempty"`
+	AllowedSourceAddresses     *[]string                       `json:"allowedSourceAddresses,omitempty"`
+	ForwardAddressTranslations *[]ForwardAddressTranslationDTO `json:"forwardAddressTranslations,omitempty"`
+	AllowedPortRanges          *[]ConfigPortsDTO               `json:"allowedPortRanges,omitempty"`
+	ListenOptions              *ListenOptionsDTO               `json:"listenOptions,omitempty"`
+	Proxy                      *ProxyDTO                       `json:"proxy,omitempty"`
+	HTTPChecks                 *[]HTTPCheckDTO                 `json:"httpChecks,omitempty"`
+	PortChecks                 *[]PortCheckDTO                 `json:"portChecks,omitempty"`
 }
 
 func AttributesToListenOptionsStruct(ctx context.Context, attr map[string]attr.Value) ListenOptionsDTO {
@@ -608,6 +643,54 @@ func convertChecksToTerraformList(ctx context.Context, checks interface{}, model
 
 }
 
+func convertFATDTOToTerraformList(ctx context.Context, translations *[]ForwardAddressTranslationDTO) types.List {
+	if translations == nil || len(*translations) == 0 {
+		return types.ListNull(ForwardAddressTranslationModel)
+	}
+	var objects []attr.Value
+	for _, t := range *translations {
+		objMap := map[string]attr.Value{
+			"from":          types.StringPointerValue(t.From),
+			"to":            types.StringPointerValue(t.To),
+			"prefix_length": types.Int32PointerValue(t.PrefixLength),
+		}
+		obj, _ := basetypes.NewObjectValue(ForwardAddressTranslationModel.AttrTypes, objMap)
+		objects = append(objects, obj)
+	}
+	list, _ := types.ListValueFrom(ctx, ForwardAddressTranslationModel, objects)
+	return list
+}
+
+func convertFATElementsToDTO(elements []attr.Value) *[]ForwardAddressTranslationDTO {
+	if len(elements) == 0 {
+		return nil
+	}
+	translations := make([]ForwardAddressTranslationDTO, 0, len(elements))
+	for _, v := range elements {
+		if obj, ok := v.(types.Object); ok {
+			attrs := obj.Attributes()
+			dto := ForwardAddressTranslationDTO{}
+			if from, ok := attrs["from"].(types.String); ok && !from.IsNull() {
+				s := from.ValueString()
+				dto.From = &s
+			}
+			if to, ok := attrs["to"].(types.String); ok && !to.IsNull() {
+				s := to.ValueString()
+				dto.To = &s
+			}
+			if pl, ok := attrs["prefix_length"].(types.Int32); ok && !pl.IsNull() {
+				i := pl.ValueInt32()
+				dto.PrefixLength = &i
+			}
+			translations = append(translations, dto)
+		}
+	}
+	if len(translations) == 0 {
+		return nil
+	}
+	return &translations
+}
+
 func (dto *HostConfigDTO) ConvertToZitiResourceModel(ctx context.Context) hostV1ConfigResourceModel {
 
 	res := hostV1ConfigResourceModel{
@@ -621,6 +704,7 @@ func (dto *HostConfigDTO) ConvertToZitiResourceModel(ctx context.Context) hostV1
 	res.AllowedProtocols = convertStringList(ctx, dto.AllowedProtocols, types.StringType)
 	res.AllowedAddresses = convertStringList(ctx, dto.AllowedAddresses, types.StringType)
 	res.AllowedSourceAddresses = convertStringList(ctx, dto.AllowedSourceAddresses, types.StringType)
+	res.ForwardAddressTranslations = convertFATDTOToTerraformList(ctx, dto.ForwardAddressTranslations)
 
 	if dto.AllowedPortRanges != nil {
 		var objects []attr.Value
@@ -704,19 +788,20 @@ func (r *hostV1ConfigResourceModel) ToHostConfigDTO(ctx context.Context) HostCon
 	}
 
 	hostConfigDto := HostConfigDTO{
-		Address:                r.Address.ValueStringPointer(),
-		Protocol:               r.Protocol.ValueStringPointer(),
-		ListenOptions:          &listenOptions,
-		Proxy:                  &proxy,
-		PortChecks:             &portChecks,
-		HTTPChecks:             &httpChecks,
-		ForwardAddress:         r.ForwardAddress.ValueBoolPointer(),
-		ForwardPort:            r.ForwardPort.ValueBoolPointer(),
-		ForwardProtocol:        r.ForwardProtocol.ValueBoolPointer(),
-		Port:                   r.Port.ValueInt32Pointer(),
-		AllowedProtocols:       ElementsToStringArray(r.AllowedProtocols.Elements()),
-		AllowedAddresses:       ElementsToStringArray(r.AllowedAddresses.Elements()),
-		AllowedSourceAddresses: ElementsToStringArray(r.AllowedSourceAddresses.Elements()),
+		Address:                    r.Address.ValueStringPointer(),
+		Protocol:                   r.Protocol.ValueStringPointer(),
+		ListenOptions:              &listenOptions,
+		Proxy:                      &proxy,
+		PortChecks:                 &portChecks,
+		HTTPChecks:                 &httpChecks,
+		ForwardAddress:             r.ForwardAddress.ValueBoolPointer(),
+		ForwardPort:                r.ForwardPort.ValueBoolPointer(),
+		ForwardProtocol:            r.ForwardProtocol.ValueBoolPointer(),
+		Port:                       r.Port.ValueInt32Pointer(),
+		AllowedProtocols:           ElementsToStringArray(r.AllowedProtocols.Elements()),
+		AllowedAddresses:           ElementsToStringArray(r.AllowedAddresses.Elements()),
+		AllowedSourceAddresses:     ElementsToStringArray(r.AllowedSourceAddresses.Elements()),
+		ForwardAddressTranslations: convertFATElementsToDTO(r.ForwardAddressTranslations.Elements()),
 	}
 
 	if len(r.AllowedPortRanges.Elements()) > 0 {

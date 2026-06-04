@@ -49,24 +49,25 @@ func (r *hostV1ConfigDataSource) Metadata(_ context.Context, req datasource.Meta
 
 // hostV1ConfigDataSourceModel maps the datasource schema data.
 type hostV1ConfigDataSourceModel struct {
-	ID                     types.String `tfsdk:"id"`
-	Name                   types.String `tfsdk:"name"`
-	Address                types.String `tfsdk:"address"`
-	ConfigTypeId           types.String `tfsdk:"config_type_id"`
-	Port                   types.Int32  `tfsdk:"port"`
-	Protocol               types.String `tfsdk:"protocol"`
-	ForwardProtocol        types.Bool   `tfsdk:"forward_protocol"`
-	ForwardPort            types.Bool   `tfsdk:"forward_port"`
-	ForwardAddress         types.Bool   `tfsdk:"forward_address"`
-	AllowedProtocols       types.List   `tfsdk:"allowed_protocols"`
-	AllowedAddresses       types.List   `tfsdk:"allowed_addresses"`
-	AllowedSourceAddresses types.List   `tfsdk:"allowed_source_addresses"`
-	AllowedPortRanges      types.List   `tfsdk:"allowed_port_ranges"`
-	ListenOptions          types.Object `tfsdk:"listen_options"`
-	Proxy                  types.Object `tfsdk:"proxy"`
-	PortChecks             types.List   `tfsdk:"port_checks"`
-	HTTPChecks             types.List   `tfsdk:"http_checks"`
-	Tags                   types.Map    `tfsdk:"tags"`
+	ID                         types.String `tfsdk:"id"`
+	Name                       types.String `tfsdk:"name"`
+	Address                    types.String `tfsdk:"address"`
+	ConfigTypeId               types.String `tfsdk:"config_type_id"`
+	Port                       types.Int32  `tfsdk:"port"`
+	Protocol                   types.String `tfsdk:"protocol"`
+	ForwardProtocol            types.Bool   `tfsdk:"forward_protocol"`
+	ForwardPort                types.Bool   `tfsdk:"forward_port"`
+	ForwardAddress             types.Bool   `tfsdk:"forward_address"`
+	AllowedProtocols           types.List   `tfsdk:"allowed_protocols"`
+	AllowedAddresses           types.List   `tfsdk:"allowed_addresses"`
+	AllowedSourceAddresses     types.List   `tfsdk:"allowed_source_addresses"`
+	ForwardAddressTranslations types.List   `tfsdk:"forward_address_translations"`
+	AllowedPortRanges          types.List   `tfsdk:"allowed_port_ranges"`
+	ListenOptions              types.Object `tfsdk:"listen_options"`
+	Proxy                      types.Object `tfsdk:"proxy"`
+	PortChecks                 types.List   `tfsdk:"port_checks"`
+	HTTPChecks                 types.List   `tfsdk:"http_checks"`
+	Tags                       types.Map    `tfsdk:"tags"`
 }
 
 // Schema defines the schema for the datasource.
@@ -117,6 +118,23 @@ func (r *hostV1ConfigDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 				ElementType:         types.StringType,
 				Computed:            true,
 				MarkdownDescription: "Source addresses that can be forwarded.",
+			},
+			"forward_address_translations": schema.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Address translations to forward.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"from": schema.StringAttribute{
+							Computed: true,
+						},
+						"to": schema.StringAttribute{
+							Computed: true,
+						},
+						"prefix_length": schema.Int32Attribute{
+							Computed: true,
+						},
+					},
+				},
 			},
 			"proxy": schema.SingleNestedAttribute{
 				Computed: true,
@@ -269,21 +287,22 @@ func (r *hostV1ConfigDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 
 func ResourceModelToDataSourceModel(resourceModel hostV1ConfigResourceModel) hostV1ConfigDataSourceModel {
 	dataSourceModel := hostV1ConfigDataSourceModel{
-		Name:                   resourceModel.Name,
-		Address:                resourceModel.Address,
-		Port:                   resourceModel.Port,
-		Protocol:               resourceModel.Protocol,
-		ForwardProtocol:        resourceModel.ForwardProtocol,
-		ForwardPort:            resourceModel.ForwardPort,
-		ForwardAddress:         resourceModel.ForwardAddress,
-		AllowedProtocols:       resourceModel.AllowedProtocols,
-		AllowedAddresses:       resourceModel.AllowedAddresses,
-		AllowedSourceAddresses: resourceModel.AllowedSourceAddresses,
-		AllowedPortRanges:      resourceModel.AllowedPortRanges,
-		ListenOptions:          resourceModel.ListenOptions,
-		Proxy:                  resourceModel.Proxy,
-		PortChecks:             resourceModel.PortChecks,
-		HTTPChecks:             resourceModel.HTTPChecks,
+		Name:                       resourceModel.Name,
+		Address:                    resourceModel.Address,
+		Port:                       resourceModel.Port,
+		Protocol:                   resourceModel.Protocol,
+		ForwardProtocol:            resourceModel.ForwardProtocol,
+		ForwardPort:                resourceModel.ForwardPort,
+		ForwardAddress:             resourceModel.ForwardAddress,
+		AllowedProtocols:           resourceModel.AllowedProtocols,
+		AllowedAddresses:           resourceModel.AllowedAddresses,
+		AllowedSourceAddresses:     resourceModel.AllowedSourceAddresses,
+		ForwardAddressTranslations: resourceModel.ForwardAddressTranslations,
+		AllowedPortRanges:          resourceModel.AllowedPortRanges,
+		ListenOptions:              resourceModel.ListenOptions,
+		Proxy:                      resourceModel.Proxy,
+		PortChecks:                 resourceModel.PortChecks,
+		HTTPChecks:                 resourceModel.HTTPChecks,
 	}
 	return dataSourceModel
 

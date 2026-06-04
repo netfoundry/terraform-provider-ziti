@@ -13,6 +13,18 @@ resource "ziti_host_v1_config" "test_host" {
   allowed_addresses        = ["localhost"]
   allowed_source_addresses = ["192.168.1.1"]
   allowed_protocols        = ["tcp", "udp"]
+  forward_address_translations = [
+    {
+      from          = "192.168.1.0"
+      to            = "172.16.4.0"
+      prefix_length = 24
+    },
+    {
+      from          = "10.0.0.0"
+      to            = "10.10.0.0"
+      prefix_length = 16
+    }
+  ]
   http_checks = [
     {
       url            = "https://localhost/health"
