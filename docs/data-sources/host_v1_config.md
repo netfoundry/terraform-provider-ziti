@@ -38,6 +38,7 @@ output "ziti_host_config" {
 - `allowed_source_addresses` (List of String) Source addresses that can be forwarded.
 - `config_type_id` (String) The Id of a config-type
 - `forward_address` (Boolean) Flag which controls whether to forward allowedAddresses
+- `forward_address_translations` (Attributes List) Address translations to forward. (see [below for nested schema](#nestedatt--forward_address_translations))
 - `forward_port` (Boolean) Flag which controls whether to forward allowedPortRanges
 - `forward_protocol` (Boolean) Flag which controls whether to forward allowedProtocols
 - `http_checks` (Attributes List) HTTP Checks. (see [below for nested schema](#nestedatt--http_checks))
@@ -55,6 +56,16 @@ Read-Only:
 
 - `high` (Number)
 - `low` (Number)
+
+
+<a id="nestedatt--forward_address_translations"></a>
+### Nested Schema for `forward_address_translations`
+
+Read-Only:
+
+- `from` (String)
+- `prefix_length` (Number)
+- `to` (String)
 
 
 <a id="nestedatt--http_checks"></a>

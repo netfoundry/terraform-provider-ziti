@@ -44,6 +44,18 @@ resource "ziti_host_v2_config" "test_host_v2" {
       allowed_addresses        = ["localhost"]
       allowed_source_addresses = ["192.168.1.1"]
       allowed_protocols        = ["tcp", "udp"]
+      forward_address_translations = [
+        {
+          from          = "192.168.1.0"
+          to            = "172.16.4.0"
+          prefix_length = 24
+        },
+        {
+          from          = "10.0.0.0"
+          to            = "10.10.0.0"
+          prefix_length = 16
+        }
+      ]
       http_checks = [
         {
           url            = "https://localhost/health"
@@ -173,6 +185,7 @@ Optional:
 - `allowed_protocols` (List of String) Protocols that can be forwarded.
 - `allowed_source_addresses` (List of String) Source addresses that can be forwarded.
 - `forward_address` (Boolean) Flag which controls whether to forward allowedAddresses
+- `forward_address_translations` (Attributes List) Address translations to forward. (see [below for nested schema](#nestedatt--terminators--forward_address_translations))
 - `forward_port` (Boolean) Flag which controls whether to forward allowedPortRanges
 - `forward_protocol` (Boolean) Flag which controls whether to forward allowedProtocols
 - `http_checks` (Attributes List) HTTP Checks. (see [below for nested schema](#nestedatt--terminators--http_checks))
@@ -189,6 +202,16 @@ Required:
 
 - `high` (Number)
 - `low` (Number)
+
+
+<a id="nestedatt--terminators--forward_address_translations"></a>
+### Nested Schema for `terminators.forward_address_translations`
+
+Required:
+
+- `from` (String)
+- `prefix_length` (Number)
+- `to` (String)
 
 
 <a id="nestedatt--terminators--http_checks"></a>

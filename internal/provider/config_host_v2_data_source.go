@@ -115,6 +115,23 @@ func (r *hostV2ConfigDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 							Computed:            true,
 							MarkdownDescription: "Source addresses that can be forwarded.",
 						},
+						"forward_address_translations": schema.ListNestedAttribute{
+							Computed:            true,
+							MarkdownDescription: "Address translations to forward.",
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"from": schema.StringAttribute{
+										Computed: true,
+									},
+									"to": schema.StringAttribute{
+										Computed: true,
+									},
+									"prefix_length": schema.Int32Attribute{
+										Computed: true,
+									},
+								},
+							},
+						},
 						"proxy": schema.SingleNestedAttribute{
 							Computed: true,
 							Attributes: map[string]schema.Attribute{
