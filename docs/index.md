@@ -12,23 +12,54 @@ Ziti Terraform Provider
 ## Example Usage
 
 ```terraform
-## using values inside provider
+## Option A — username/password (inline values)
 provider "ziti" {
+  host     = "https://<domain>:<port>/edge/management/v1"
   username = "ziti_session_username"
   password = "ziti_session_password"
-  host     = "https://<domain>:<port>/edge/management/v1"
 }
 
-## using env values
+## Option B — username/password (environment variables)
+## Set ZITI_API_HOST, ZITI_API_USERNAME, ZITI_API_PASSWORD before running Terraform.
+provider "ziti" {}
+
+## Option C — identity file (mTLS, no username/password required)
+## Point at a Ziti identity JSON file on the Terraform runner.
+## Env equivalent: ZITI_API_IDENTITY_FILE
 provider "ziti" {
-  //env variables ZITI_API_USERNAME, ZITI_API_PASSWORD and ZITI_API_HOST should be set.
+  host          = "https://<domain>:<port>/edge/management/v1"
+  identity_file = "/secure/terraform-automation.json"
 }
 
-## provider for HA enabled
+## Option D — identity JSON inline (mTLS, sourced from a secret store)
+## Useful when the identity file content is retrieved from Vault, AWS Secrets Manager, etc.
+## Env equivalent: ZITI_API_IDENTITY_JSON
+provider "ziti" {
+  host          = "https://<domain>:<port>/edge/management/v1"
+  identity_json = file("/secure/terraform-automation.json")
+}
+
+## Option E — explicit PEM material (mTLS)
+## Supply cert, key, and CA directly (e.g. extracted from a secret store or generated inline).
+provider "ziti" {
+  host = "https://<domain>:<port>/edge/management/v1"
+  cert = file("client.cert.pem")
+  key  = file("client.key.pem")
+  ca   = file("ca.pem")
+}
+
+## Option F — HA with username/password
+## Authenticates against the first reachable controller; prefers the cluster leader.
 provider "ziti" {
   username = "ziti_session_username"
   password = "ziti_session_password"
   hosts    = ["https://<domain1>:<port1>/edge/management/v1", "https://<domain2>:<port2>/edge/management/v1"]
+}
+
+## Option G — HA with identity file (mTLS)
+provider "ziti" {
+  identity_file = "/secure/terraform-automation.json"
+  hosts         = ["https://<domain1>:<port1>/edge/management/v1", "https://<domain2>:<port2>/edge/management/v1"]
 }
 ```
 
@@ -39,5 +70,10 @@ provider "ziti" {
 
 - `host` (String) Ziti controller Host/Domain URL. Use `hosts` to configure multiple controllers for HA failover.
 - `hosts` (List of String) List of Ziti controller Host/Domain URLs for HA failover. First successful authentication wins. Finds and prefers the leader
-- `password` (String, Sensitive) Ziti Session password
-- `username` (String) Ziti Session username
+- `username` (String) Ziti Session username (password auth). Env: ZITI_API_USERNAME.
+- `password` (String, Sensitive) Ziti Session password (password auth). Env: ZITI_API_PASSWORD.
+- `identity_file` (String) Path to a Ziti identity JSON file containing cert/key/ca PEM material for mTLS authentication. Env: ZITI_API_IDENTITY_FILE.
+- `identity_json` (String, Sensitive) Inline Ziti identity JSON string containing cert/key/ca PEM material for mTLS authentication. Env: ZITI_API_IDENTITY_JSON.
+- `key` (String, Sensitive) PEM-encoded client private key for mTLS authentication.
+- `ca` (String) PEM-encoded CA certificate used to verify the Ziti controller's server certificate.
+- `cert` (String, Sensitive) PEM-encoded client certificate for mTLS authentication.
