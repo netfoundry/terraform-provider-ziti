@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -74,12 +75,35 @@ func (p *zitiProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp 
 			},
 			"username": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "Ziti Session username",
+				MarkdownDescription: "Ziti Session username (password auth). Env: ZITI_API_USERNAME.",
 			},
 			"password": schema.StringAttribute{
 				Optional:            true,
 				Sensitive:           true,
-				MarkdownDescription: "Ziti Session password",
+				MarkdownDescription: "Ziti Session password (password auth). Env: ZITI_API_PASSWORD.",
+			},
+			"identity_file": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "Path to a Ziti identity JSON file containing cert/key/ca PEM material for mTLS authentication. Env: ZITI_API_IDENTITY_FILE.",
+			},
+			"identity_json": schema.StringAttribute{
+				Optional:            true,
+				Sensitive:           true,
+				MarkdownDescription: "Inline Ziti identity JSON string containing cert/key/ca PEM material for mTLS authentication. Env: ZITI_API_IDENTITY_JSON.",
+			},
+			"cert": schema.StringAttribute{
+				Optional:            true,
+				Sensitive:           true,
+				MarkdownDescription: "PEM-encoded client certificate for mTLS authentication.",
+			},
+			"key": schema.StringAttribute{
+				Optional:            true,
+				Sensitive:           true,
+				MarkdownDescription: "PEM-encoded client private key for mTLS authentication.",
+			},
+			"ca": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "PEM-encoded CA certificate used to verify the Ziti controller's server certificate.",
 			},
 		},
 	}
@@ -87,10 +111,15 @@ func (p *zitiProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp 
 
 // zitiProviderModel maps provider schema data to a Go type.
 type zitiProviderModel struct {
-	Host     types.String `tfsdk:"host"`
-	Hosts    types.List   `tfsdk:"hosts"`
-	Username types.String `tfsdk:"username"`
-	Password types.String `tfsdk:"password"`
+	Host         types.String `tfsdk:"host"`
+	Hosts        types.List   `tfsdk:"hosts"`
+	Username     types.String `tfsdk:"username"`
+	Password     types.String `tfsdk:"password"`
+	IdentityFile types.String `tfsdk:"identity_file"`
+	IdentityJSON types.String `tfsdk:"identity_json"`
+	Cert         types.String `tfsdk:"cert"`
+	Key          types.String `tfsdk:"key"`
+	CA           types.String `tfsdk:"ca"`
 }
 
 // tryAuthenticate authenticates against a single Ziti controller and returns the session token.
@@ -130,6 +159,67 @@ func tryAuthenticate(host, username, password string) (string, error) {
 		return "", fmt.Errorf("no token returned in auth response")
 	}
 	return token, nil
+}
+
+// tryAuthenticateCert authenticates using an mTLS client certificate (?method=cert)
+// and returns the session token. When caPEM is non-empty the server certificate is
+// verified against that CA; otherwise InsecureSkipVerify is used (consistent with
+// the existing password-auth behaviour).
+func tryAuthenticateCert(host, certPEM, keyPEM, caPEM string) (string, error) {
+	clientCert, err := tls.X509KeyPair([]byte(certPEM), []byte(keyPEM))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse client certificate/key: %w", err)
+	}
+	tlsCfg := &tls.Config{
+		Certificates:       []tls.Certificate{clientCert},
+		InsecureSkipVerify: true,
+	}
+	if caPEM != "" {
+		pool := x509.NewCertPool()
+		if ok := pool.AppendCertsFromPEM([]byte(caPEM)); ok {
+			tlsCfg.RootCAs = pool
+			tlsCfg.InsecureSkipVerify = false
+		}
+	}
+	transport := &http.Transport{TLSClientConfig: tlsCfg}
+	httpClient := &http.Client{Transport: transport, Timeout: 15 * time.Second}
+
+	authURL := fmt.Sprintf("%s/authenticate?method=cert", host)
+	creq, err := http.NewRequest("POST", authURL, bytes.NewBufferString("{}"))
+	if err != nil {
+		return "", fmt.Errorf("failed to build cert auth request: %w", err)
+	}
+	creq.Header.Add("Content-Type", "application/json")
+	cresp, err := httpClient.Do(creq)
+	if err != nil {
+		return "", fmt.Errorf("cert auth request failed: %w", err)
+	}
+	body, err := io.ReadAll(cresp.Body)
+	defer cresp.Body.Close()
+	if err != nil {
+		return "", fmt.Errorf("error reading cert auth response: %w", err)
+	}
+	if cresp.StatusCode != http.StatusOK && cresp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("status %d: %s", cresp.StatusCode, string(body))
+	}
+	token := gjson.GetBytes(body, "data.token").String()
+	if token == "" {
+		return "", fmt.Errorf("no token returned in cert auth response")
+	}
+	return token, nil
+}
+
+// parsePemFromZitiIdentity extracts cert, key, and ca PEM strings from a Ziti
+// identity JSON file. The file stores each PEM blob prefixed with "pem:", which
+// is stripped before returning.
+func parsePemFromZitiIdentity(jsonData string) (cert, key, ca string, err error) {
+	cert = strings.TrimPrefix(gjson.Get(jsonData, "id.cert").String(), "pem:")
+	key = strings.TrimPrefix(gjson.Get(jsonData, "id.key").String(), "pem:")
+	ca = strings.TrimPrefix(gjson.Get(jsonData, "id.ca").String(), "pem:")
+	if cert == "" || key == "" {
+		return "", "", "", fmt.Errorf("identity JSON missing required 'id.cert' or 'id.key' fields")
+	}
+	return cert, key, ca, nil
 }
 
 type clusterMember struct {
@@ -199,82 +289,112 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
-	if config.Host.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
-			"Unknown ziti API Host",
-			"The provider cannot create the ziti API client as there is an unknown configuration value for the API host. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the ZITI_API_HOST environment variable.",
-		)
+	for _, attr := range []struct {
+		unknown bool
+		name    string
+		summary string
+	}{
+		{config.Host.IsUnknown(), "host", "Unknown ziti API Host"},
+		{config.Hosts.IsUnknown(), "hosts", "Unknown ziti API Hosts"},
+		{config.Username.IsUnknown(), "username", "Unknown ziti API Username"},
+		{config.Password.IsUnknown(), "password", "Unknown ziti API Password"},
+		{config.IdentityFile.IsUnknown(), "identity_file", "Unknown ziti identity_file"},
+		{config.IdentityJSON.IsUnknown(), "identity_json", "Unknown ziti identity_json"},
+		{config.Cert.IsUnknown(), "cert", "Unknown ziti cert"},
+		{config.Key.IsUnknown(), "key", "Unknown ziti key"},
+		{config.CA.IsUnknown(), "ca", "Unknown ziti ca"},
+	} {
+		if attr.unknown {
+			resp.Diagnostics.AddAttributeError(
+				path.Root(attr.name),
+				attr.summary,
+				"Either target apply the source of the value first or set the value statically in the configuration.",
+			)
+		}
 	}
-
-	if config.Hosts.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("hosts"),
-			"Unknown ziti API Hosts",
-			"The provider cannot create the ziti API client as there is an unknown configuration value for the API hosts list. "+
-				"Either target apply the source of the value first or set the values statically in the configuration.",
-		)
-	}
-
-	if config.Username.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("username"),
-			"Unknown ziti API Username",
-			"The provider cannot create the ziti API client as there is an unknown configuration value for the API username. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the ZITI_API_USERNAME environment variable.",
-		)
-	}
-
-	if config.Password.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("password"),
-			"Unknown ziti API Password",
-			"The provider cannot create the ziti API client as there is an unknown configuration value for the API password. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the ZITI_API_PASSWORD environment variable.",
-		)
-	}
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	username := os.Getenv("ZITI_API_USERNAME")
-	password := os.Getenv("ZITI_API_PASSWORD")
-
-	if !config.Username.IsNull() {
-		username = config.Username.ValueString()
+	// --- Resolve cert material -------------------------------------------------
+	// Resolution order: identity_file > identity_json > explicit cert/key/ca fields.
+	// ZITI_API_IDENTITY_FILE and ZITI_API_IDENTITY_JSON env vars provide defaults.
+	identityFile := os.Getenv("ZITI_API_IDENTITY_FILE")
+	identityJSON := os.Getenv("ZITI_API_IDENTITY_JSON")
+	if !config.IdentityFile.IsNull() {
+		identityFile = config.IdentityFile.ValueString()
+	}
+	if !config.IdentityJSON.IsNull() {
+		identityJSON = config.IdentityJSON.ValueString()
+	}
+	if identityFile != "" {
+		data, err := os.ReadFile(identityFile)
+		if err != nil {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("identity_file"),
+				"Failed to read identity file",
+				err.Error(),
+			)
+			return
+		}
+		identityJSON = string(data)
 	}
 
-	if !config.Password.IsNull() {
-		password = config.Password.ValueString()
+	var certPEM, keyPEM, caPEM string
+	if identityJSON != "" {
+		c, k, ca, err := parsePemFromZitiIdentity(identityJSON)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to parse Ziti identity JSON", err.Error())
+			return
+		}
+		certPEM, keyPEM, caPEM = c, k, ca
+	}
+	// Explicit PEM fields override values extracted from the identity JSON.
+	if !config.Cert.IsNull() {
+		certPEM = config.Cert.ValueString()
+	}
+	if !config.Key.IsNull() {
+		keyPEM = config.Key.ValueString()
+	}
+	if !config.CA.IsNull() {
+		caPEM = config.CA.ValueString()
 	}
 
-	if username == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("username"),
-			"Missing ziti API Username",
-			"The provider cannot create the ziti API client as there is a missing or empty value for the ziti API username. "+
-				"Set the username value in the configuration or use the ZITI_API_USERNAME environment variable. "+
-				"If either is already set, ensure the value is not empty.",
-		)
+	useCertAuth := certPEM != "" && keyPEM != ""
+
+	// --- Resolve username/password (only required when not using cert auth) ----
+	var username, password string
+	if !useCertAuth {
+		username = os.Getenv("ZITI_API_USERNAME")
+		password = os.Getenv("ZITI_API_PASSWORD")
+		if !config.Username.IsNull() {
+			username = config.Username.ValueString()
+		}
+		if !config.Password.IsNull() {
+			password = config.Password.ValueString()
+		}
+		if username == "" {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("username"),
+				"Missing ziti API Username",
+				"Provide 'username' (or ZITI_API_USERNAME) when not using certificate authentication "+
+					"(identity_file, identity_json, or cert/key).",
+			)
+		}
+		if password == "" {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("password"),
+				"Missing ziti API Password",
+				"Provide 'password' (or ZITI_API_PASSWORD) when not using certificate authentication "+
+					"(identity_file, identity_json, or cert/key).",
+			)
+		}
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
-	if password == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("password"),
-			"Missing ziti API Password",
-			"The provider cannot create the ziti API client as there is a missing or empty value for the ziti API password. "+
-				"Set the password value in the configuration or use the ZITI_API_PASSWORD environment variable. "+
-				"If either is already set, ensure the value is not empty.",
-		)
-	}
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Build an ordered, deduplicated list of controllers to try.
+	// --- Build an ordered, deduplicated list of controllers to try ------------
 	// 'host' is prepended first so existing single-host configs are unaffected.
 	// 'hosts' elements follow for HA failover.
 	// Falls back to ZITI_API_HOST only when neither attribute provides any value.
@@ -319,14 +439,26 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
-	ctx = tflog.SetField(ctx, "ziti_username", username)
-	tflog.Debug(ctx, "Creating ziti client")
+	if useCertAuth {
+		tflog.Debug(ctx, "Creating ziti client using certificate (mTLS) authentication")
+	} else {
+		ctx = tflog.SetField(ctx, "ziti_username", username)
+		tflog.Debug(ctx, "Creating ziti client using password authentication")
+	}
+
+	// authenticate is a unified wrapper that selects the right auth method.
+	authenticate := func(h string) (string, error) {
+		if useCertAuth {
+			return tryAuthenticateCert(h, certPEM, keyPEM, caPEM)
+		}
+		return tryAuthenticate(h, username, password)
+	}
 
 	// Try each controller in order; use the first one that authenticates.
 	var activeHost, zitiToken string
 	var authErrs []string
 	for _, h := range allHosts {
-		token, err := tryAuthenticate(h, username, password)
+		token, err := authenticate(h)
 		if err != nil {
 			log.Warn().Msgf("Failed to authenticate with Ziti controller %s: %v", h, err)
 			authErrs = append(authErrs, fmt.Sprintf("%s: %v", h, err))
@@ -370,7 +502,7 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 					log.Warn().Msgf("Skipping cluster member %s (bad address %q): %v", m.ID, m.Address, err)
 					continue
 				}
-				token, err := tryAuthenticate(memberHost, username, password)
+				token, err := authenticate(memberHost)
 				if err != nil {
 					log.Warn().Msgf("Auth failed for cluster member %s (%s): %v", m.ID, memberHost, err)
 					continue
