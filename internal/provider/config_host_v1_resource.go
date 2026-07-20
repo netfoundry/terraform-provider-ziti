@@ -941,6 +941,13 @@ func (r *hostV1ConfigResource) Read(ctx context.Context, req resource.ReadReques
 	newState.ConfigTypeId = state.ConfigTypeId
 	newState.Tags = state.Tags
 	newState.LastUpdated = state.LastUpdated
+
+	// The API omits address when it is an empty string. Preserve "" from old
+	// state so the plan doesn't show a spurious add on every refresh.
+	if newState.Address.IsNull() && !state.Address.IsNull() && state.Address.ValueString() == "" {
+		newState.Address = state.Address
+	}
+
 	state = newState
 
 	// Set refreshed state

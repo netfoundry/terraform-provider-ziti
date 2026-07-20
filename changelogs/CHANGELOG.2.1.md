@@ -1,3 +1,10 @@
+# v2.1.1
+
+## What's New
+
+* Handled empty string field in host v1 config
+
+
 # v2.1.0
 
 ## What's New
