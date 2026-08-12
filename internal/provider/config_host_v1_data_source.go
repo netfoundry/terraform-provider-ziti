@@ -157,7 +157,13 @@ func (r *hostV1ConfigDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 					"connect_timeout": schema.StringAttribute{
 						Computed: true,
 					},
+					"connect_timeout_seconds": schema.Int32Attribute{
+						Computed: true,
+					},
 					"cost": schema.Int32Attribute{
+						Computed: true,
+					},
+					"identity": schema.StringAttribute{
 						Computed: true,
 					},
 					"max_connections": schema.Int32Attribute{
