@@ -228,6 +228,10 @@ func (r *hostV2ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 									//Computed: true,
 									//Default:  stringdefault.StaticString("5s"),
 								},
+								"connect_timeout_seconds": schema.Int32Attribute{
+									Optional:            true,
+									MarkdownDescription: "Timeout in seconds when making outbound connections. Upstream host.v2 prefers connectTimeout when both are set; unlike host.v1 this schema leaves connect_timeout without a static default, so this attribute is effective when connect_timeout is unset.",
+								},
 								"cost": schema.Int32Attribute{
 									Optional: true,
 									//Computed: true,
@@ -235,6 +239,10 @@ func (r *hostV2ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 									Validators: []validator.Int32{
 										int32validator.Between(0, 65535),
 									},
+								},
+								"identity": schema.StringAttribute{
+									Optional:            true,
+									MarkdownDescription: "Associate the hosting terminator with the specified identity. '$tunneler_id.name' resolves to the name of the hosting tunneler's identity. '$tunneler_id.tag[tagName]' resolves to the value of the 'tagName' tag on the hosting tunneler's identity.",
 								},
 								"max_connections": schema.Int32Attribute{
 									Optional: true,

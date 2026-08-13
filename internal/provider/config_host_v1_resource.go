@@ -54,7 +54,9 @@ var ListenOptionsModel = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
 		"bind_using_edge_identity": types.BoolType,
 		"connect_timeout":          types.StringType,
+		"connect_timeout_seconds":  types.Int32Type,
 		"cost":                     types.Int32Type,
+		"identity":                 types.StringType,
 		"max_connections":          types.Int32Type,
 		"precedence":               types.StringType,
 	},
@@ -262,6 +264,10 @@ func (r *hostV1ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 						Computed: true,
 						Default:  stringdefault.StaticString("5s"),
 					},
+					"connect_timeout_seconds": schema.Int32Attribute{
+						Optional:            true,
+						MarkdownDescription: "Timeout in seconds when making outbound connections. NOTE: upstream host.v1 uses connectTimeout in preference when BOTH are set, and connect_timeout carries a static default of \"5s\" in this provider -- so this attribute has no effect unless that default is removed.",
+					},
 					"cost": schema.Int32Attribute{
 						Optional: true,
 						Computed: true,
@@ -269,6 +275,10 @@ func (r *hostV1ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 						Validators: []validator.Int32{
 							int32validator.Between(0, 65535),
 						},
+					},
+					"identity": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "Associate the hosting terminator with the specified identity. '$tunneler_id.name' resolves to the name of the hosting tunneler's identity. '$tunneler_id.tag[tagName]' resolves to the value of the 'tagName' tag on the hosting tunneler's identity.",
 					},
 					"max_connections": schema.Int32Attribute{
 						Optional: true,
@@ -466,7 +476,9 @@ func (r *hostV1ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 type ListenOptionsDTO struct {
 	BindUsingEdgeIdentity *bool   `json:"bindUsingEdgeIdentity,omitempty"`
 	ConnectTimeout        *string `json:"connectTimeout,omitempty"`
+	ConnectTimeoutSeconds *int32  `json:"connectTimeoutSeconds,omitempty"`
 	Cost                  *int32  `json:"cost,omitempty"`
+	Identity              *string `json:"identity,omitempty"`
 	MaxConnections        *int32  `json:"maxConnections,omitempty"`
 	Precedence            *string `json:"precedence,omitempty"`
 }
