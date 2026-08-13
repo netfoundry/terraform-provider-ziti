@@ -1,3 +1,11 @@
+# v2.1.2
+
+## What's New
+
+* Handle drift caused by listenOptions.connectTimeoutSeconds in host.v1
+* Expose listenOptions.identity and listenOptions.connectTimeoutSeconds in host.v1 and host.v2. Updated by [@paradizelost](https://github.com/paradizelost)
+
+
 # v2.1.1
 
 ## What's New

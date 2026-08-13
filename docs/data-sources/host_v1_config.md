@@ -101,7 +101,9 @@ Read-Only:
 
 - `bind_using_edge_identity` (Boolean)
 - `connect_timeout` (String)
+- `connect_timeout_seconds` (Number)
 - `cost` (Number)
+- `identity` (String)
 - `max_connections` (Number)
 - `precedence` (String)
 

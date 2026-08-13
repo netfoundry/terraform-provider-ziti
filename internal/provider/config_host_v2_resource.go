@@ -230,7 +230,7 @@ func (r *hostV2ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 								},
 								"connect_timeout_seconds": schema.Int32Attribute{
 									Optional:            true,
-									MarkdownDescription: "Timeout in seconds when making outbound connections. Upstream host.v2 prefers connectTimeout when both are set; unlike host.v1 this schema leaves connect_timeout without a static default, so this attribute is effective when connect_timeout is unset.",
+									MarkdownDescription: "Timeout in seconds when making outbound connections. Upstream host.v2 prefers connectTimeout when both are set",
 								},
 								"cost": schema.Int32Attribute{
 									Optional: true,

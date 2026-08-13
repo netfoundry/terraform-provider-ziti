@@ -253,7 +253,9 @@ Optional:
 
 - `bind_using_edge_identity` (Boolean)
 - `connect_timeout` (String)
+- `connect_timeout_seconds` (Number) Timeout in seconds when making outbound connections. Upstream host.v2 prefers connectTimeout when both are set
 - `cost` (Number)
+- `identity` (String) Associate the hosting terminator with the specified identity. '$tunneler_id.name' resolves to the name of the hosting tunneler's identity. '$tunneler_id.tag[tagName]' resolves to the value of the 'tagName' tag on the hosting tunneler's identity.
 - `max_connections` (Number)
 - `precedence` (String)
 

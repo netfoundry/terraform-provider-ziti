@@ -261,12 +261,10 @@ func (r *hostV1ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 					},
 					"connect_timeout": schema.StringAttribute{
 						Optional: true,
-						Computed: true,
-						Default:  stringdefault.StaticString("5s"),
 					},
 					"connect_timeout_seconds": schema.Int32Attribute{
 						Optional:            true,
-						MarkdownDescription: "Timeout in seconds when making outbound connections. NOTE: upstream host.v1 uses connectTimeout in preference when BOTH are set, and connect_timeout carries a static default of \"5s\" in this provider -- so this attribute has no effect unless that default is removed.",
+						MarkdownDescription: "Timeout in seconds when making outbound connections. NOTE: upstream host.v1 uses connectTimeout in preference when BOTH are set.",
 					},
 					"cost": schema.Int32Attribute{
 						Optional: true,
@@ -544,6 +542,38 @@ func AttributesToListenOptionsStruct(ctx context.Context, attr map[string]attr.V
 	GenericFromObject(attrsNative, &listenOptions)
 	return listenOptions
 
+}
+
+// preserveNullListenOptionAttr guards against the upstream API always
+// reporting a listen_options attribute at its zero value even when it was
+// never configured (e.g. connect_timeout as "0s", connect_timeout_seconds as
+// 0). If the new value equals that zero value and it was null in the prior
+// state, the null is preserved so the attribute doesn't drift on every
+// refresh. An explicitly configured zero value is left untouched, since it
+// would already be reflected as non-null in the prior state.
+func preserveNullListenOptionAttr(newObj, oldObj types.Object, attrName string, zeroValue, nullValue attr.Value) types.Object {
+	if newObj.IsNull() || newObj.IsUnknown() || oldObj.IsNull() || oldObj.IsUnknown() {
+		return newObj
+	}
+	newAttrs := newObj.Attributes()
+	if newVal, ok := newAttrs[attrName]; !ok || !newVal.Equal(zeroValue) {
+		return newObj
+	}
+	if oldVal, ok := oldObj.Attributes()[attrName]; !ok || !oldVal.IsNull() {
+		return newObj
+	}
+
+	attrsCopy := make(map[string]attr.Value, len(newAttrs))
+	for k, v := range newAttrs {
+		attrsCopy[k] = v
+	}
+	attrsCopy[attrName] = nullValue
+
+	rebuilt, diags := basetypes.NewObjectValue(ListenOptionsModel.AttrTypes, attrsCopy)
+	if diags.HasError() {
+		return newObj
+	}
+	return rebuilt
 }
 
 func AttributesToProxyStruct(ctx context.Context, attr map[string]attr.Value) ProxyDTO {
@@ -959,6 +989,13 @@ func (r *hostV1ConfigResource) Read(ctx context.Context, req resource.ReadReques
 	if newState.Address.IsNull() && !state.Address.IsNull() && state.Address.ValueString() == "" {
 		newState.Address = state.Address
 	}
+
+	// The API always reports connectTimeout/connectTimeoutSeconds, defaulting
+	// to "0s"/0 respectively when they were never configured. Preserve null
+	// from old state so an unconfigured attribute doesn't drift on every
+	// refresh.
+	newState.ListenOptions = preserveNullListenOptionAttr(newState.ListenOptions, state.ListenOptions, "connect_timeout", types.StringValue("0s"), types.StringNull())
+	newState.ListenOptions = preserveNullListenOptionAttr(newState.ListenOptions, state.ListenOptions, "connect_timeout_seconds", types.Int32Value(0), types.Int32Null())
 
 	state = newState
 
