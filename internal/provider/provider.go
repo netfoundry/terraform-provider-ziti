@@ -483,6 +483,10 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		members, err := fetchClusterMembers(activeHost, zitiToken)
 		if err != nil {
 			log.Warn().Msgf("Could not fetch cluster members from %s: %v", activeHost, err)
+			resp.Diagnostics.AddWarning(
+				"Ziti HA leader discovery failed",
+				fmt.Sprintf("Could not fetch cluster members from %s: %v. Continuing with this host, which may not be the current leader.", activeHost, err),
+			)
 		} else {
 			// Sort so the leader is tried first.
 			leaderFirst := make([]clusterMember, 0, len(members))
@@ -493,6 +497,8 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 					leaderFirst = append(leaderFirst, m)
 				}
 			}
+			leaderReauthed := false
+			var memberErrs []string
 			for _, m := range leaderFirst {
 				if !m.Connected {
 					continue
@@ -500,22 +506,30 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 				memberHost, err := memberToHost(m.Address, activeHost)
 				if err != nil {
 					log.Warn().Msgf("Skipping cluster member %s (bad address %q): %v", m.ID, m.Address, err)
+					memberErrs = append(memberErrs, fmt.Sprintf("%s: bad address %q: %v", m.ID, m.Address, err))
 					continue
 				}
 				token, err := authenticate(memberHost)
 				if err != nil {
 					log.Warn().Msgf("Auth failed for cluster member %s (%s): %v", m.ID, memberHost, err)
+					memberErrs = append(memberErrs, fmt.Sprintf("%s (%s): %v", m.ID, memberHost, err))
 					continue
 				}
 				log.Info().Msgf("Using cluster member %s (leader=%v) at %s", m.ID, m.Leader, memberHost)
 				activeHost = memberHost
 				zitiToken = token
+				leaderReauthed = true
 				break
+			}
+			if !leaderReauthed {
+				resp.Diagnostics.AddWarning(
+					"Ziti HA leader re-authentication failed",
+					fmt.Sprintf("Could not re-authenticate against any connected cluster member (tried %d); continuing with %s, which may not be the current leader. Errors: %s",
+						len(leaderFirst), activeHost, strings.Join(memberErrs, "; ")),
+				)
 			}
 		}
 	}
-
-	fmt.Printf("Using zitiToken: %s\n", zitiToken)
 
 	resourceData := zitiData{
 		apiToken: zitiToken,
