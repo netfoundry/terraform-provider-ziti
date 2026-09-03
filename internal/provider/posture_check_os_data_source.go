@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -32,7 +33,7 @@ type postureCheckOSDataSource struct {
 }
 
 // Configure adds the provider configured client to the datasource.
-func (r *postureCheckOSDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (r *postureCheckOSDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	// Add a nil check when handling ProviderData because Terraform
 	// sets that data after it calls the ConfigureProvider RPC.
 	if req.ProviderData == nil {
@@ -42,8 +43,7 @@ func (r *postureCheckOSDataSource) Configure(_ context.Context, req datasource.C
 	datasourceConfig := req.ProviderData.(*zitiData)
 	r.datasourceConfig = datasourceConfig
 
-	fmt.Printf("Using API Token to create datasource: %s\n", r.datasourceConfig.apiToken)
-	fmt.Printf("Using domain to create datasource: %s\n", r.datasourceConfig.host)
+	tflog.Debug(ctx, "Configured ziti data source", map[string]any{"host": r.datasourceConfig.host})
 }
 
 // Metadata returns the datasource type name.
@@ -139,12 +139,11 @@ func (r *postureCheckOSDataSource) Read(ctx context.Context, req datasource.Read
 	err = json.Unmarshal([]byte(cresp), &jsonBody)
 	if err != nil {
 		log.Error().Msgf("Error unmarshalling JSON response from Ziti DataSource Response: %v", err)
-		fmt.Println("Error unmarshalling JSON:", err)
 		return
 	}
 
 	stringBody := string(cresp)
-	fmt.Printf("**********************read response************************:\n %s\n", stringBody)
+	tflog.Debug(ctx, "read response", map[string]any{"response": stringBody})
 
 	service := jsonBody["data"].([]interface{})
 

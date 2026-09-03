@@ -44,7 +44,7 @@ type postureCheckMacResource struct {
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *postureCheckMacResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *postureCheckMacResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Add a nil check when handling ProviderData because Terraform
 	// sets that data after it calls the ConfigureProvider RPC.
 	if req.ProviderData == nil {
@@ -54,8 +54,7 @@ func (r *postureCheckMacResource) Configure(_ context.Context, req resource.Conf
 	resourceConfig := req.ProviderData.(*zitiData)
 	r.resourceConfig = resourceConfig
 
-	fmt.Printf("Using API Token to create resource: %s\n", r.resourceConfig.apiToken)
-	fmt.Printf("Using domain to create resource: %s\n", r.resourceConfig.host)
+	tflog.Debug(ctx, "Configured ziti resource", map[string]any{"host": r.resourceConfig.host})
 }
 
 // Metadata returns the resource type name.
@@ -170,7 +169,7 @@ func (r *postureCheckMacResource) Create(ctx context.Context, req resource.Creat
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************create resource payload***********************:\n %s\n", jsonData)
+	tflog.Debug(ctx, "create resource payload", map[string]any{"payload": string(jsonData)})
 
 	authUrl := fmt.Sprintf("%s/posture-checks", r.resourceConfig.host)
 	cresp, err := CreateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
@@ -183,7 +182,7 @@ func (r *postureCheckMacResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	fmt.Printf("**********************create response************************:\n %s\n", cresp)
+	tflog.Debug(ctx, "create response", map[string]any{"response": cresp})
 	resourceID := gjson.Get(cresp, "data.id").String()
 
 	// Map response body to schema and populate Computed attribute values
@@ -236,7 +235,7 @@ func (r *postureCheckMacResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	stringBody := string(cresp)
-	fmt.Printf("**********************read response************************:\n %s\n", stringBody)
+	tflog.Debug(ctx, "read response", map[string]any{"response": stringBody})
 
 	data, ok := jsonBody["data"].(map[string]interface{})
 	if !ok {
@@ -337,7 +336,7 @@ func (r *postureCheckMacResource) Update(ctx context.Context, req resource.Updat
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
+	tflog.Debug(ctx, "update resource payload", map[string]any{"payload": string(jsonData)})
 
 	authUrl := fmt.Sprintf("%s/posture-checks/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 	cresp, err := PatchZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)

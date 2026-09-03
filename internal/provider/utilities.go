@@ -58,7 +58,7 @@ func sortAttributes(ctx context.Context, listItems types.List) types.List {
 
 	attributes, err := types.ListValueFrom(ctx, types.StringType, attrStrings)
 	if err != nil {
-		fmt.Printf("Error converting string list to types.list:\n %s\n", err)
+		tflog.Error(ctx, "Error converting string list to types.list", map[string]any{"error": fmt.Sprintf("%v", err)})
 	}
 
 	return attributes

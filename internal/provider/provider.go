@@ -515,8 +515,6 @@ func (p *zitiProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		}
 	}
 
-	fmt.Printf("Using zitiToken: %s\n", zitiToken)
-
 	resourceData := zitiData{
 		apiToken: zitiToken,
 		host:     activeHost,
