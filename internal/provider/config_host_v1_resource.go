@@ -109,7 +109,7 @@ var ForwardAddressTranslationModel = types.ObjectType{
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *hostV1ConfigResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *hostV1ConfigResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Add a nil check when handling ProviderData because Terraform
 	// sets that data after it calls the ConfigureProvider RPC.
 	if req.ProviderData == nil {
@@ -119,8 +119,7 @@ func (r *hostV1ConfigResource) Configure(_ context.Context, req resource.Configu
 	resourceConfig := req.ProviderData.(*zitiData)
 	r.resourceConfig = resourceConfig
 
-	fmt.Printf("Using API Token to create resource: %s\n", r.resourceConfig.apiToken)
-	fmt.Printf("Using domain to create resource: %s\n", r.resourceConfig.host)
+	tflog.Debug(ctx, "Configured ziti resource", map[string]any{"host": r.resourceConfig.host})
 }
 
 // Metadata returns the resource type name.
@@ -890,7 +889,7 @@ func (r *hostV1ConfigResource) Create(ctx context.Context, req resource.CreateRe
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************create resource payload***********************:\n %s\n", jsonData)
+	tflog.Debug(ctx, "create resource payload", map[string]any{"payload": string(jsonData)})
 
 	authUrl := fmt.Sprintf("%s/configs", r.resourceConfig.host)
 	cresp, err := CreateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
@@ -903,7 +902,7 @@ func (r *hostV1ConfigResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	fmt.Printf("**********************create response************************:\n %s\n", cresp)
+	tflog.Debug(ctx, "create response", map[string]any{"response": cresp})
 	resourceID := gjson.Get(cresp, "data.id").String()
 
 	// Map response body to schema and populate Computed attribute values
@@ -950,12 +949,11 @@ func (r *hostV1ConfigResource) Read(ctx context.Context, req resource.ReadReques
 	err = json.Unmarshal([]byte(cresp), &jsonBody)
 	if err != nil {
 		log.Error().Msgf("Error unmarshalling JSON response from Ziti Resource Response: %v", err)
-		fmt.Println("Error unmarshalling JSON:", err)
 		return
 	}
 
 	stringBody := string(cresp)
-	fmt.Printf("**********************read response************************:\n %s\n", stringBody)
+	tflog.Debug(ctx, "read response", map[string]any{"response": stringBody})
 
 	data := jsonBody["data"].(map[string]interface{})
 	resourceData := data["data"].(map[string]interface{})
@@ -963,7 +961,7 @@ func (r *hostV1ConfigResource) Read(ctx context.Context, req resource.ReadReques
 	var hostConfigDto HostConfigDTO
 	GenericFromObject(resourceData, &hostConfigDto)
 	newState := hostConfigDto.ConvertToZitiResourceModel(ctx)
-	fmt.Printf("**********************newState************************:\n %+v\n", newState)
+	tflog.Debug(ctx, "newState", map[string]any{"state": fmt.Sprintf("%+v", newState)})
 
 	// Manually assign individual values from the map to the struct fields
 	state.Name = types.StringValue(data["name"].(string))
@@ -1049,7 +1047,7 @@ func (r *hostV1ConfigResource) Update(ctx context.Context, req resource.UpdateRe
 
 	// Convert the payload to JSON
 	jsonData, _ := json.Marshal(payload)
-	fmt.Printf("**********************update resource payload***********************:\n %s\n", jsonData)
+	tflog.Debug(ctx, "update resource payload", map[string]any{"payload": string(jsonData)})
 
 	authUrl := fmt.Sprintf("%s/configs/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
 	cresp, err := UpdateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
