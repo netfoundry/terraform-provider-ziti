@@ -2,6 +2,8 @@
 
 ## What's New
 
+* Handle Post method retry logic and preserve the state info even if enrolment jwt is not retrieved
+
 * Removed the debug `fmt.Print` statements from every resource and data source; the session token is no longer written to the plugin's output stream, and payload/response dumps now go through `tflog` so they only appear when `TF_LOG` is enabled
 
 
