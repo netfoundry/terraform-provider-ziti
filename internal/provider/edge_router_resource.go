@@ -229,7 +229,27 @@ func (r *edgeRouterResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	if jwtToken == "" {
-		resp.Diagnostics.AddError("Error Fetching JWT", "Timeout while waiting for JWT to be available")
+		// The edge router was already created in the controller (it has resourceID),
+		// so it must be saved to state even though enrollment never finished --
+		// otherwise Terraform loses track of it and the next apply tries to
+		// create it again. enrollment_token is Computed, so it cannot be left
+		// unset (unknown); it must be explicitly null for the state to be
+		// wholly known.
+		eplan.EnrollmentJwt = types.StringNull()
+		eplan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+
+		diags = resp.State.Set(ctx, eplan)
+		resp.Diagnostics.Append(diags...)
+
+		resp.Diagnostics.AddError(
+			"Error Fetching JWT",
+			fmt.Sprintf(
+				"Timeout while waiting for the enrollment JWT for edge router %q. The edge router was created "+
+					"in the Ziti controller, but its enrollment_token could not be retrieved. This resource "+
+					"has been saved to state and the next 'terraform apply' will destroy and recreate it. ",
+				resourceID,
+			),
+		)
 		return
 	}
 
