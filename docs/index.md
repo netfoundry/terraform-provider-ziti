@@ -68,12 +68,12 @@ provider "ziti" {
 
 ### Optional
 
+- `ca` (String) PEM-encoded CA certificate used to verify the Ziti controller's server certificate.
+- `cert` (String, Sensitive) PEM-encoded client certificate for mTLS authentication.
 - `host` (String) Ziti controller Host/Domain URL. Use `hosts` to configure multiple controllers for HA failover.
 - `hosts` (List of String) List of Ziti controller Host/Domain URLs for HA failover. First successful authentication wins. Finds and prefers the leader
-- `username` (String) Ziti Session username (password auth). Env: ZITI_API_USERNAME.
-- `password` (String, Sensitive) Ziti Session password (password auth). Env: ZITI_API_PASSWORD.
 - `identity_file` (String) Path to a Ziti identity JSON file containing cert/key/ca PEM material for mTLS authentication. Env: ZITI_API_IDENTITY_FILE.
 - `identity_json` (String, Sensitive) Inline Ziti identity JSON string containing cert/key/ca PEM material for mTLS authentication. Env: ZITI_API_IDENTITY_JSON.
 - `key` (String, Sensitive) PEM-encoded client private key for mTLS authentication.
-- `ca` (String) PEM-encoded CA certificate used to verify the Ziti controller's server certificate.
-- `cert` (String, Sensitive) PEM-encoded client certificate for mTLS authentication.
+- `password` (String, Sensitive) Ziti Session password (password auth). Env: ZITI_API_PASSWORD.
+- `username` (String) Ziti Session username (password auth). Env: ZITI_API_USERNAME.
