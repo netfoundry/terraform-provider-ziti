@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -131,8 +130,6 @@ func (r *interceptV1ConfigResource) Schema(_ context.Context, _ resource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"connect_timeout_seconds": schema.Int32Attribute{
 						Optional: true,
-						Computed: true,
-						Default:  int32default.StaticInt32(0),
 					},
 					"identity": schema.StringAttribute{
 						Optional: true,
