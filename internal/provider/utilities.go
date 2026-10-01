@@ -256,6 +256,9 @@ func ElementsToStringArray(elements []attr.Value) *[]string {
 func AttributesToNativeTypes(ctx context.Context, attrs map[string]attr.Value) map[string]interface{} {
 	result := make(map[string]interface{})
 	for key, value := range attrs {
+		if value.IsNull() || value.IsUnknown() {
+			continue
+		}
 		if val, ok := value.(types.String); ok {
 			result[key] = val.ValueString()
 		} else if val, ok := value.(types.Int32); ok {
