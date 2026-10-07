@@ -166,10 +166,13 @@ func (r *hostV2ConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 							MarkdownDescription: "Flag which controls whether to forward allowedAddresses",
 						},
 						"allowed_addresses": schema.ListAttribute{
-							ElementType:         types.StringType,
-							Optional:            true,
-							Computed:            true,
-							Default:             listdefault.StaticValue(types.ListNull(types.StringType)),
+							ElementType: types.StringType,
+							Optional:    true,
+							Computed:    true,
+							Default:     listdefault.StaticValue(types.ListNull(types.StringType)),
+							Validators: []validator.List{
+								listvalidator.ValueStringsAre(NoProtocolExpression()),
+							},
 							MarkdownDescription: "Addresses that can be forwarded.",
 						},
 						"allowed_source_addresses": schema.ListAttribute{
