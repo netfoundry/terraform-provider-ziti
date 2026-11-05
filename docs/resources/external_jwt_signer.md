@@ -22,6 +22,15 @@ resource "ziti_external_jwt_signer" "test_external_jwt_signer" {
   external_auth_url = ""
   target_token      = "ACCESS"
   cert_pem          = "-----BEGIN CERTIFICATE-----\naaaaaaaaa\nbbbbbbb\n-----END CERTIFICATE-----\n"
+
+  # Optional: JIT enrollment settings. Omit any of these to leave them
+  # unmanaged by this resource (the controller's own default applies).
+  enroll_to_token_enabled          = true
+  enroll_to_cert_enabled           = false
+  enroll_name_claims_selector      = "preferred_username"
+  enroll_attribute_claims_selector = "groups"
+  enroll_auth_policy_id            = "default"
+
   tags = {
     cost = "test"
   }
@@ -43,10 +52,15 @@ resource "ziti_external_jwt_signer" "test_external_jwt_signer" {
 - `claims_property` (String) Claims Property
 - `client_id` (String) Client ID
 - `enabled` (Boolean) Enabled
+- `enroll_attribute_claims_selector` (String) Root level property name or JSON pointer used to populate the `attributes` field of an enrolling identity. Left unset, the controller's own default applies.
+- `enroll_auth_policy_id` (String) ID of the Authentication Policy used for enrolling identities. Left unset, the controller's own default applies.
+- `enroll_name_claims_selector` (String) Root level property name or JSON pointer used to populate the `name` field of an enrolling identity. Left unset, the controller's own default applies (e.g. `/sub`).
+- `enroll_to_cert_enabled` (Boolean) Allows clients with a valid JWT to enroll and obtain a certificate for authentication. Left unset, the controller's own default applies.
+- `enroll_to_token_enabled` (Boolean) Allows clients with a valid JWT to enroll and continue authenticating via tokens. Left unset, the controller's own default applies.
 - `external_auth_url` (String) External Auth URL
 - `jwks_endpoint` (String) Jwks Endpoint
 - `kid` (String) Kid
-- `scopes` (List of String) Scopes List
+- `scopes` (Set of String) Scopes List.
 - `tags` (Map of String) External jwt signer Tags
 - `target_token` (String)
 - `use_external_id` (Boolean) Use External ID Flag

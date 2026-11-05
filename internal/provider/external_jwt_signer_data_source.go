@@ -49,21 +49,27 @@ func (r *jwtSignerDataSource) Metadata(_ context.Context, req datasource.Metadat
 
 // jwtSignerDataSourceModel maps the datasource schema data.
 type jwtSignerDataSourceModel struct {
-	ID              types.String `tfsdk:"id"`
-	Name            types.String `tfsdk:"name"`
-	Issuer          types.String `tfsdk:"issuer"`
-	Audience        types.String `tfsdk:"audience"`
-	ClaimsProperty  types.String `tfsdk:"claims_property"`
-	UseExternalId   types.Bool   `tfsdk:"use_external_id"`
-	ClientID        types.String `tfsdk:"client_id"`
-	ExternalAuthURL types.String `tfsdk:"external_auth_url"`
-	Scopes          types.List   `tfsdk:"scopes"`
-	TargetToken     types.String `tfsdk:"target_token"`
-	JwksEndpoint    types.String `tfsdk:"jwks_endpoint"`
-	CertPem         types.String `tfsdk:"cert_pem"`
-	Kid             types.String `tfsdk:"kid"`
-	Enabled         types.Bool   `tfsdk:"enabled"`
-	Tags            types.Map    `tfsdk:"tags"`
+	ID                            types.String `tfsdk:"id"`
+	Name                          types.String `tfsdk:"name"`
+	Issuer                        types.String `tfsdk:"issuer"`
+	Audience                      types.String `tfsdk:"audience"`
+	ClaimsProperty                types.String `tfsdk:"claims_property"`
+	UseExternalId                 types.Bool   `tfsdk:"use_external_id"`
+	ClientID                      types.String `tfsdk:"client_id"`
+	ExternalAuthURL               types.String `tfsdk:"external_auth_url"`
+	Scopes                        types.Set    `tfsdk:"scopes"`
+	TargetToken                   types.String `tfsdk:"target_token"`
+	JwksEndpoint                  types.String `tfsdk:"jwks_endpoint"`
+	CertPem                       types.String `tfsdk:"cert_pem"`
+	Kid                           types.String `tfsdk:"kid"`
+	Enabled                       types.Bool   `tfsdk:"enabled"`
+	EnrollToTokenEnabled          types.Bool   `tfsdk:"enroll_to_token_enabled"`
+	EnrollToCertEnabled           types.Bool   `tfsdk:"enroll_to_cert_enabled"`
+	EnrollNameClaimsSelector      types.String `tfsdk:"enroll_name_claims_selector"`
+	EnrollAttributeClaimsSelector types.String `tfsdk:"enroll_attribute_claims_selector"`
+	EnrollAuthPolicyID            types.String `tfsdk:"enroll_auth_policy_id"`
+
+	Tags types.Map `tfsdk:"tags"`
 }
 
 // Schema defines the schema for the datasource.
@@ -107,7 +113,7 @@ func (r *jwtSignerDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 				Optional:            true,
 				MarkdownDescription: "External Auth URL",
 			},
-			"scopes": schema.ListAttribute{
+			"scopes": schema.SetAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
@@ -133,6 +139,26 @@ func (r *jwtSignerDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 				Optional:            true,
 				Computed:            true,
 				MarkdownDescription: "Enabled",
+			},
+			"enroll_to_token_enabled": schema.BoolAttribute{
+				Computed:            true,
+				MarkdownDescription: "Allows clients with a valid JWT to enroll and continue authenticating via tokens.",
+			},
+			"enroll_to_cert_enabled": schema.BoolAttribute{
+				Computed:            true,
+				MarkdownDescription: "Allows clients with a valid JWT to enroll and obtain a certificate for authentication.",
+			},
+			"enroll_name_claims_selector": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Root level property name or JSON pointer used to populate the `name` field of an enrolling identity.",
+			},
+			"enroll_attribute_claims_selector": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Root level property name or JSON pointer used to populate the `attributes` field of an enrolling identity.",
+			},
+			"enroll_auth_policy_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "ID of the Authentication Policy used for enrolling identities.",
 			},
 			"tags": schema.MapAttribute{
 				Computed:            true,
@@ -247,12 +273,42 @@ func (r *jwtSignerDataSource) Read(ctx context.Context, req datasource.ReadReque
 		state.Enabled = types.BoolValue(enabled)
 	}
 
+	if enrollToTokenEnabled, ok := data["enrollToTokenEnabled"].(bool); ok {
+		state.EnrollToTokenEnabled = types.BoolValue(enrollToTokenEnabled)
+	} else {
+		state.EnrollToTokenEnabled = types.BoolValue(false)
+	}
+
+	if enrollToCertEnabled, ok := data["enrollToCertEnabled"].(bool); ok {
+		state.EnrollToCertEnabled = types.BoolValue(enrollToCertEnabled)
+	} else {
+		state.EnrollToCertEnabled = types.BoolValue(false)
+	}
+
+	if enrollNameClaimsSelector, ok := data["enrollNameClaimsSelector"].(string); ok && enrollNameClaimsSelector != "" {
+		state.EnrollNameClaimsSelector = types.StringValue(enrollNameClaimsSelector)
+	} else {
+		state.EnrollNameClaimsSelector = types.StringValue("/sub")
+	}
+
+	if enrollAttributeClaimsSelector, ok := data["enrollAttributeClaimsSelector"].(string); ok && enrollAttributeClaimsSelector != "" {
+		state.EnrollAttributeClaimsSelector = types.StringValue(enrollAttributeClaimsSelector)
+	} else {
+		state.EnrollAttributeClaimsSelector = types.StringNull()
+	}
+
+	if enrollAuthPolicyID, ok := data["enrollAuthPolicyId"].(string); ok && enrollAuthPolicyID != "" {
+		state.EnrollAuthPolicyID = types.StringValue(enrollAuthPolicyID)
+	} else {
+		state.EnrollAuthPolicyID = types.StringValue("default")
+	}
+
 	if scopes, ok := data["scopes"].([]interface{}); ok {
-		scopes, diag := types.ListValueFrom(ctx, types.StringType, scopes)
+		scopes, diag := types.SetValueFrom(ctx, types.StringType, scopes)
 		resp.Diagnostics = append(resp.Diagnostics, diag...)
 		state.Scopes = scopes
 	} else {
-		state.Scopes = types.ListNull(types.StringType)
+		state.Scopes = types.SetNull(types.StringType)
 	}
 
 	if _tags, ok := data["tags"].(map[string]interface{}); ok {

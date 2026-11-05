@@ -35,12 +35,17 @@ output "ziti_jwt_signer" {
 - `jwks_endpoint` (String) Jwks Endpoint
 - `kid` (String) Kid
 - `name` (String) Name of the external jwt
-- `scopes` (List of String) Scopes List
+- `scopes` (Set of String) Scopes List
 - `target_token` (String)
 - `use_external_id` (Boolean) Use External ID Flag
 
 ### Read-Only
 
 - `audience` (String) Audience
+- `enroll_attribute_claims_selector` (String) Root level property name or JSON pointer used to populate the `attributes` field of an enrolling identity.
+- `enroll_auth_policy_id` (String) ID of the Authentication Policy used for enrolling identities.
+- `enroll_name_claims_selector` (String) Root level property name or JSON pointer used to populate the `name` field of an enrolling identity.
+- `enroll_to_cert_enabled` (Boolean) Allows clients with a valid JWT to enroll and obtain a certificate for authentication.
+- `enroll_to_token_enabled` (Boolean) Allows clients with a valid JWT to enroll and continue authenticating via tokens.
 - `issuer` (String) Issuer
 - `tags` (Map of String) External jwt signer Tags
