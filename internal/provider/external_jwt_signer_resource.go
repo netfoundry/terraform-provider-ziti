@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
@@ -108,6 +109,88 @@ type jwtSignerPayload struct {
 	EnrollAuthPolicyID            *string  `json:"enrollAuthPolicyId,omitempty"`
 
 	Tags *rest_model.Tags `json:"tags,omitempty"`
+}
+
+// stringPointerIfKnown returns a pointer to v's value, or nil if v is null or
+// unknown. A nil result is omitted from the request payload (the "...,omitempty"
+// struct tags), leaving that field untouched on the controller.
+func stringPointerIfKnown(v types.String) *string {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	s := v.ValueString()
+	return &s
+}
+
+// boolPointerIfKnown returns a pointer to v's value, or nil if v is null or
+// unknown. See stringPointerIfKnown.
+func boolPointerIfKnown(v types.Bool) *bool {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	b := v.ValueBool()
+	return &b
+}
+
+// populateEnrollFields assigns the five enrollment attributes on model from
+// data, the "data" object of an external-jwt-signer API response. It is used
+// by Read, and by Create/Update to resolve the Computed enrollment
+// attributes immediately after a write, since those attributes may still be
+// unknown in the plan (see the enroll_* UseStateForUnknown plan modifiers)
+// and Terraform requires every attribute to be known before the final state
+// is set.
+func populateEnrollFields(data map[string]interface{}, model *jwtSignerResourceModel) {
+	if v, ok := data["enrollToTokenEnabled"].(bool); ok {
+		model.EnrollToTokenEnabled = types.BoolValue(v)
+	} else {
+		model.EnrollToTokenEnabled = types.BoolValue(false)
+	}
+
+	if v, ok := data["enrollToCertEnabled"].(bool); ok {
+		model.EnrollToCertEnabled = types.BoolValue(v)
+	} else {
+		model.EnrollToCertEnabled = types.BoolValue(false)
+	}
+
+	if v, ok := data["enrollNameClaimsSelector"].(string); ok && v != "" {
+		model.EnrollNameClaimsSelector = types.StringValue(v)
+	} else {
+		model.EnrollNameClaimsSelector = types.StringValue("/sub")
+	}
+
+	if v, ok := data["enrollAttributeClaimsSelector"].(string); ok && v != "" {
+		model.EnrollAttributeClaimsSelector = types.StringValue(v)
+	} else {
+		model.EnrollAttributeClaimsSelector = types.StringNull()
+	}
+
+	if v, ok := data["enrollAuthPolicyId"].(string); ok && v != "" {
+		model.EnrollAuthPolicyID = types.StringValue(v)
+	} else {
+		model.EnrollAuthPolicyID = types.StringValue("default")
+	}
+}
+
+// fetchExternalJwtSignerData GETs the external jwt signer identified by id
+// and returns the "data" object of the response.
+func (r *jwtSignerResource) fetchExternalJwtSignerData(id string) (map[string]interface{}, error) {
+	authUrl := fmt.Sprintf("%s/external-jwt-signers/%s", r.resourceConfig.host, url.QueryEscape(id))
+	cresp, err := ReadZitiResource(authUrl, r.resourceConfig.apiToken)
+	if err != nil {
+		return nil, err
+	}
+
+	var jsonBody map[string]interface{}
+	if err := json.Unmarshal([]byte(cresp), &jsonBody); err != nil {
+		return nil, err
+	}
+
+	data, ok := jsonBody["data"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("'data' is either missing or not a map[string]interface{}")
+	}
+
+	return data, nil
 }
 
 // Schema defines the schema for the resource.
@@ -210,32 +293,44 @@ func (r *jwtSignerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				MarkdownDescription: "Enabled",
 			},
 			"enroll_to_token_enabled": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: "Allows clients with a valid JWT to enroll and continue authenticating via tokens. Defaults to false.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "Allows clients with a valid JWT to enroll and continue authenticating via tokens. Left unset, the controller's own default applies.",
 			},
 			"enroll_to_cert_enabled": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: "Allows clients with a valid JWT to enroll and obtain a certificate for authentication. Defaults to false.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "Allows clients with a valid JWT to enroll and obtain a certificate for authentication. Left unset, the controller's own default applies.",
 			},
 			"enroll_name_claims_selector": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             stringdefault.StaticString("/sub"),
-				MarkdownDescription: "Root level property name or JSON pointer used to populate the `name` field of an enrolling identity. Defaults to `/sub`.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "Root level property name or JSON pointer used to populate the `name` field of an enrolling identity. Left unset, the controller's own default applies (e.g. `/sub`).",
 			},
 			"enroll_attribute_claims_selector": schema.StringAttribute{
-				Optional:            true,
-				MarkdownDescription: "Root level property name or JSON pointer used to populate the `attributes` field of an enrolling identity. Defaults to unset.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "Root level property name or JSON pointer used to populate the `attributes` field of an enrolling identity. Left unset, the controller's own default applies.",
 			},
 			"enroll_auth_policy_id": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             stringdefault.StaticString("default"),
-				MarkdownDescription: "ID of the Authentication Policy used for enrolling identities. Defaults to `default`.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "ID of the Authentication Policy used for enrolling identities. Left unset, the controller's own default applies.",
 			},
 			"tags": schema.MapAttribute{
 				Computed:            true,
@@ -272,11 +367,6 @@ func (r *jwtSignerResource) Create(ctx context.Context, req resource.CreateReque
 	useExternalId := eplan.UseExternalId.ValueBool()
 	enabled := eplan.Enabled.ValueBool()
 
-	enrollToTokenEnabled := eplan.EnrollToTokenEnabled.ValueBool()
-	enrollToCertEnabled := eplan.EnrollToCertEnabled.ValueBool()
-	enrollNameClaimsSelector := eplan.EnrollNameClaimsSelector.ValueString()
-	enrollAuthPolicyID := eplan.EnrollAuthPolicyID.ValueString()
-
 	var jwksEndpoint *string
 	if !eplan.JwksEndpoint.IsNull() && !eplan.JwksEndpoint.IsUnknown() {
 		v := eplan.JwksEndpoint.ValueString()
@@ -289,11 +379,11 @@ func (r *jwtSignerResource) Create(ctx context.Context, req resource.CreateReque
 		certPem = &v
 	}
 
-	var enrollAttributeClaimsSelector *string
-	if !eplan.EnrollAttributeClaimsSelector.IsNull() && !eplan.EnrollAttributeClaimsSelector.IsUnknown() {
-		v := eplan.EnrollAttributeClaimsSelector.ValueString()
-		enrollAttributeClaimsSelector = &v
-	}
+	enrollToTokenEnabled := boolPointerIfKnown(eplan.EnrollToTokenEnabled)
+	enrollToCertEnabled := boolPointerIfKnown(eplan.EnrollToCertEnabled)
+	enrollNameClaimsSelector := stringPointerIfKnown(eplan.EnrollNameClaimsSelector)
+	enrollAttributeClaimsSelector := stringPointerIfKnown(eplan.EnrollAttributeClaimsSelector)
+	enrollAuthPolicyID := stringPointerIfKnown(eplan.EnrollAuthPolicyID)
 
 	var scopes []string
 	for _, value := range eplan.Scopes.Elements() {
@@ -316,11 +406,11 @@ func (r *jwtSignerResource) Create(ctx context.Context, req resource.CreateReque
 		CertPem:                       certPem,
 		Kid:                           &kid,
 		Enabled:                       &enabled,
-		EnrollToTokenEnabled:          &enrollToTokenEnabled,
-		EnrollToCertEnabled:           &enrollToCertEnabled,
-		EnrollNameClaimsSelector:      &enrollNameClaimsSelector,
+		EnrollToTokenEnabled:          enrollToTokenEnabled,
+		EnrollToCertEnabled:           enrollToCertEnabled,
+		EnrollNameClaimsSelector:      enrollNameClaimsSelector,
 		EnrollAttributeClaimsSelector: enrollAttributeClaimsSelector,
-		EnrollAuthPolicyID:            &enrollAuthPolicyID,
+		EnrollAuthPolicyID:            enrollAuthPolicyID,
 
 		Tags: tags,
 	}
@@ -342,6 +432,20 @@ func (r *jwtSignerResource) Create(ctx context.Context, req resource.CreateReque
 
 	tflog.Debug(ctx, "create response", map[string]any{"response": cresp})
 	resourceID := gjson.Get(cresp, "data.id").String()
+
+	// enroll_* attributes are Computed with UseStateForUnknown, so on a brand
+	// new resource they may still be unknown in eplan; resolve them from a
+	// follow-up read, since the create response body does not reliably
+	// include them and Terraform requires every attribute to be known before
+	// the final state is set.
+	data, err := r.fetchExternalJwtSignerData(resourceID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading external jwt signer", "Could not read back external jwt signer after create, unexpected error: "+err.Error(),
+		)
+		return
+	}
+	populateEnrollFields(data, &eplan)
 
 	// Map response body to schema and populate Computed attribute values
 	eplan.ID = types.StringValue(resourceID)
@@ -448,35 +552,7 @@ func (r *jwtSignerResource) Read(ctx context.Context, req resource.ReadRequest, 
 		state.Enabled = types.BoolValue(enabled)
 	}
 
-	if enrollToTokenEnabled, ok := data["enrollToTokenEnabled"].(bool); ok {
-		state.EnrollToTokenEnabled = types.BoolValue(enrollToTokenEnabled)
-	} else {
-		state.EnrollToTokenEnabled = types.BoolValue(false)
-	}
-
-	if enrollToCertEnabled, ok := data["enrollToCertEnabled"].(bool); ok {
-		state.EnrollToCertEnabled = types.BoolValue(enrollToCertEnabled)
-	} else {
-		state.EnrollToCertEnabled = types.BoolValue(false)
-	}
-
-	if enrollNameClaimsSelector, ok := data["enrollNameClaimsSelector"].(string); ok && enrollNameClaimsSelector != "" {
-		state.EnrollNameClaimsSelector = types.StringValue(enrollNameClaimsSelector)
-	} else {
-		state.EnrollNameClaimsSelector = types.StringValue("/sub")
-	}
-
-	if enrollAttributeClaimsSelector, ok := data["enrollAttributeClaimsSelector"].(string); ok && enrollAttributeClaimsSelector != "" {
-		state.EnrollAttributeClaimsSelector = types.StringValue(enrollAttributeClaimsSelector)
-	} else {
-		state.EnrollAttributeClaimsSelector = types.StringNull()
-	}
-
-	if enrollAuthPolicyID, ok := data["enrollAuthPolicyId"].(string); ok && enrollAuthPolicyID != "" {
-		state.EnrollAuthPolicyID = types.StringValue(enrollAuthPolicyID)
-	} else {
-		state.EnrollAuthPolicyID = types.StringValue("default")
-	}
+	populateEnrollFields(data, &state)
 
 	if scopes, ok := data["scopes"].([]interface{}); ok {
 		scopes, diag := types.SetValueFrom(ctx, types.StringType, scopes)
@@ -536,11 +612,6 @@ func (r *jwtSignerResource) Update(ctx context.Context, req resource.UpdateReque
 	useExternalId := eplan.UseExternalId.ValueBool()
 	enabled := eplan.Enabled.ValueBool()
 
-	enrollToTokenEnabled := eplan.EnrollToTokenEnabled.ValueBool()
-	enrollToCertEnabled := eplan.EnrollToCertEnabled.ValueBool()
-	enrollNameClaimsSelector := eplan.EnrollNameClaimsSelector.ValueString()
-	enrollAuthPolicyID := eplan.EnrollAuthPolicyID.ValueString()
-
 	var jwksEndpoint *string
 	if !eplan.JwksEndpoint.IsNull() && !eplan.JwksEndpoint.IsUnknown() {
 		v := eplan.JwksEndpoint.ValueString()
@@ -553,11 +624,11 @@ func (r *jwtSignerResource) Update(ctx context.Context, req resource.UpdateReque
 		certPem = &v
 	}
 
-	var enrollAttributeClaimsSelector *string
-	if !eplan.EnrollAttributeClaimsSelector.IsNull() && !eplan.EnrollAttributeClaimsSelector.IsUnknown() {
-		v := eplan.EnrollAttributeClaimsSelector.ValueString()
-		enrollAttributeClaimsSelector = &v
-	}
+	enrollToTokenEnabled := boolPointerIfKnown(eplan.EnrollToTokenEnabled)
+	enrollToCertEnabled := boolPointerIfKnown(eplan.EnrollToCertEnabled)
+	enrollNameClaimsSelector := stringPointerIfKnown(eplan.EnrollNameClaimsSelector)
+	enrollAttributeClaimsSelector := stringPointerIfKnown(eplan.EnrollAttributeClaimsSelector)
+	enrollAuthPolicyID := stringPointerIfKnown(eplan.EnrollAuthPolicyID)
 
 	var scopes []string
 	for _, value := range eplan.Scopes.Elements() {
@@ -580,11 +651,11 @@ func (r *jwtSignerResource) Update(ctx context.Context, req resource.UpdateReque
 		CertPem:                       certPem,
 		Kid:                           &kid,
 		Enabled:                       &enabled,
-		EnrollToTokenEnabled:          &enrollToTokenEnabled,
-		EnrollToCertEnabled:           &enrollToCertEnabled,
-		EnrollNameClaimsSelector:      &enrollNameClaimsSelector,
+		EnrollToTokenEnabled:          enrollToTokenEnabled,
+		EnrollToCertEnabled:           enrollToCertEnabled,
+		EnrollNameClaimsSelector:      enrollNameClaimsSelector,
 		EnrollAttributeClaimsSelector: enrollAttributeClaimsSelector,
-		EnrollAuthPolicyID:            &enrollAuthPolicyID,
+		EnrollAuthPolicyID:            enrollAuthPolicyID,
 
 		Tags: tags,
 	}
@@ -594,7 +665,7 @@ func (r *jwtSignerResource) Update(ctx context.Context, req resource.UpdateReque
 	tflog.Debug(ctx, "update resource payload", map[string]any{"payload": string(jsonData)})
 
 	authUrl := fmt.Sprintf("%s/external-jwt-signers/%s", r.resourceConfig.host, url.QueryEscape(state.ID.ValueString()))
-	cresp, err := PatchZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
+	cresp, err := UpdateZitiResource(authUrl, r.resourceConfig.apiToken, jsonData)
 	msg := fmt.Sprintf("Ziti PATCH Response: %s", cresp)
 	log.Info().Msg(msg)
 	if err != nil {
@@ -603,6 +674,20 @@ func (r *jwtSignerResource) Update(ctx context.Context, req resource.UpdateReque
 		)
 		return
 	}
+
+	// enroll_* attributes use UseStateForUnknown, so in the ordinary case
+	// eplan already carries a known value here; resolve from a follow-up
+	// read regardless, since the update response body does not reliably
+	// include them and Terraform requires every attribute to be known
+	// before the final state is set.
+	data, err := r.fetchExternalJwtSignerData(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading external jwt signer", "Could not read back external jwt signer after update, unexpected error: "+err.Error(),
+		)
+		return
+	}
+	populateEnrollFields(data, &eplan)
 
 	eplan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
